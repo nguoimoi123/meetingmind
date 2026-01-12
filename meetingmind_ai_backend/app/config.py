@@ -6,5 +6,6 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY")
     MONGODB_SETTINGS = {
+        "db": os.getenv("MONGO_DB"),
         "host": os.getenv("MONGO_URI")
     }
