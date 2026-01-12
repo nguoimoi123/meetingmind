@@ -1,15 +1,16 @@
-# Core
-Flask==3.0.0
-flask-cors==4.0.0
-python-dotenv==1.0.1
-
-# MongoDB
-pymongo==4.6.1
-dnspython==2.6.1
-
-# Auth & Security
-python-jose==3.3.0
-google-auth==2.26.2
-
-# Utils
-bson==0.5.10
+blinker==1.9.0
+click==8.3.1
+dnspython==2.8.0
+email-validator==2.3.0
+Flask==3.1.2
+flask-mongoengine==1.0.0
+Flask-WTF==1.2.2
+idna==3.11
+itsdangerous==2.2.0
+Jinja2==3.1.6
+MarkupSafe==3.0.3
+mongoengine==0.29.1
+pymongo==4.16.0
+python-dotenv==1.2.1
+Werkzeug==3.1.5
+WTForms==3.2.1
