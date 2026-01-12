@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:meetingmind_ai/services/google_auth_service.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -109,9 +110,19 @@ class LoginScreen extends StatelessWidget {
 
                 // Social Login
                 OutlinedButton.icon(
-                  onPressed: () {
-                    // TODO: Add Google OAuth later
-                    Navigator.pushReplacementNamed(context, '/app');
+                  onPressed: () async {
+                    final googleAuth = GoogleAuthService();
+                    final idToken = await googleAuth.loginWithGoogle();
+
+                    if (idToken == null) return;
+
+                    final success =
+                        await googleAuth.sendTokenToBackend(idToken);
+
+                    if (success && context.mounted) {
+                      Provider.of<AuthProvider>(context, listen: false).login();
+                      context.go('/app/home');
+                    }
                   },
                   icon: Image.network(
                     'https://www.google.com/favicon.ico',
