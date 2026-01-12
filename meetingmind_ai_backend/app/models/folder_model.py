@@ -1,10 +1,10 @@
+from flask_mongoengine import MongoEngine
 from datetime import datetime
-from bson import ObjectId
+from ..extensions import db
 
-def folder_schema(user_id, name):
-    return {
-        "_id": ObjectId(),
-        "user_id": ObjectId(user_id),
-        "name": name,
-        "created_at": datetime.utcnow()
-    }
+class Folder(db.Document):
+    user_id = db.StringField(required=True)
+    name = db.StringField(required=True)
+    created_at = db.DateTimeField(default=datetime.utcnow)
+    
+    meta = {'collection': 'Folders'}

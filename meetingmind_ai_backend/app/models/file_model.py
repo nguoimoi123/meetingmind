@@ -1,13 +1,18 @@
+from flask_mongoengine import MongoEngine
 from datetime import datetime
-from bson import ObjectId
+from ..extensions import db
 
-def file_schema(user_id, folder_id, filename, file_type, size):
-    return {
-        "_id": ObjectId(),
-        "user_id": ObjectId(user_id),
-        "folder_id": ObjectId(folder_id),
-        "filename": filename,
-        "file_type": file_type,
-        "size": size,
-        "uploaded_at": datetime.utcnow()
-    }
+class File(db.Document):
+    user_id = db.StringField(required=True)
+
+    folder_id = db.StringField(required=True)
+
+    filename = db.StringField(required=True)
+
+    file_type = db.StringField(required=True)
+
+    size = db.IntField(required=True)
+
+    uploaded_at = db.DateTimeField(default=datetime.utcnow)
+    
+    meta = {'collection': 'Files'}

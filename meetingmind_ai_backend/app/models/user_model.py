@@ -1,13 +1,15 @@
+from flask_mongoengine import MongoEngine
 from datetime import datetime
-from bson import ObjectId
+from ..extensions import db
 
-def user_schema_google(email, name, avatar):
-    return {
-        "_id": ObjectId(),
-        "email": email,
-        "name": name,
-        "avatar": avatar,
-        "provider": "google",
-        "password_hash": None,
-        "created_at": datetime.utcnow()
-    }
+class User(db.Document):
+    email = db.StringField(required=True, unique=True)
+
+    name = db.StringField(required=True)
+
+    password = db.StringField(required=True)
+
+    created_at = db.DateTimeField(default=datetime.utcnow)
+
+    meta = {'collection': 'Users'}
+

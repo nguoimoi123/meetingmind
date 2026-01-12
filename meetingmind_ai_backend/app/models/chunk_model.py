@@ -1,14 +1,20 @@
+from flask_mongoengine import MongoEngine
 from datetime import datetime
-from bson import ObjectId
+from ..extensions import db
 
-def chunk_schema(user_id, folder_id, file_id, index, text, embedding):
-    return {
-        "_id": ObjectId(),
-        "user_id": ObjectId(user_id),
-        "folder_id": ObjectId(folder_id),
-        "file_id": ObjectId(file_id),
-        "chunk_index": index,
-        "text": text,
-        "embedding": embedding,  # list[float]
-        "created_at": datetime.utcnow()
-    }
+class Chunk(db.Document):
+    user_id = db.StringField(required=True)
+
+    folder_id = db.StringField(required=True)
+
+    file_id = db.StringField(required=True)
+
+    chunk_index = db.IntField(required=True)
+
+    text = db.StringField(required=True)
+
+    embedding = db.ListField(db.FloatField(), required=True)
+
+    created_at = db.DateTimeField(default=datetime.utcnow)
+    
+    meta = {'collection': 'Chunks'}
