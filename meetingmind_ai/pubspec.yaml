@@ -1,0 +1,62 @@
+name: meetingmind_ai
+description: A smart meeting assistant for professionals.
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # --- CỐT LÕI & QUẢN LÝ TRẠNG THÁI ---
+  provider: ^6.1.1
+
+  # --- GIAO DIỆN & ĐIỀU HƯỚNG ---
+  go_router: ^12.1.3
+  google_fonts: ^6.1.0
+  cached_network_image: ^3.3.0
+  flutter_svg: ^2.0.9
+  lottie: ^2.7.0
+
+  # --- KẾT NỐI MẠNG & API ---
+  dio: ^5.4.0
+  json_annotation: ^4.8.1
+
+  # --- LƯU TRỮ DỮ LIỆU CỤC BỘ ---
+  shared_preferences: ^2.2.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # --- TÍNH NĂNG CỤ THỂ ---
+  speech_to_text: ^7.0.0
+  permission_handler: ^11.1.0
+  file_picker: ^8.0.0
+  google_generative_ai: ^0.2.2
+  url_launcher: ^6.2.2
+  google_sign_in: ^6.2.1
+  http: ^1.2.0
+
+  # --- CÔNG CỤ HỖ TRỢ ---
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^3.0.1
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+  hive_generator: ^2.0.1
+
+# Flutter configuration
+flutter:
+  uses-material-design: true
+
+  # assets:
+  #   - images/
+  #   - assets/animations/

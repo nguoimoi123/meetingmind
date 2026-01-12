@@ -1,0 +1,15 @@
+# Core
+Flask==3.0.0
+flask-cors==4.0.0
+python-dotenv==1.0.1
+
+# MongoDB
+pymongo==4.6.1
+dnspython==2.6.1
+
+# Auth & Security
+python-jose==3.3.0
+google-auth==2.26.2
+
+# Utils
+bson==0.5.10
