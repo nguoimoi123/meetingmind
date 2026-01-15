@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
-
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class CreateNotebookScreen extends StatefulWidget {
@@ -17,12 +16,11 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
+  final FocusNode _titleFocusNode = FocusNode();
 
-  // Gradient màu chủ đạo (Indigo đến Purple)
-  final LinearGradient _primaryGradient = const LinearGradient(
-    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-  );
+  // Animation controller
+  late AnimationController _animationController;
+  late Animation<double> _widthAnimation;
 
   bool _hasText = false;
   bool _isLoading = false;
@@ -31,7 +29,17 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
   @override
   void initState() {
     super.initState();
-    _focusNode.requestFocus();
+    _titleFocusNode.requestFocus();
+
+    // Cấu hình Animation
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _widthAnimation = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+
     _titleController.addListener(() {
       final hasText = _titleController.text.trim().isNotEmpty;
       if (hasText != _hasText) {
@@ -40,13 +48,22 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
         });
       }
     });
+
+    _titleFocusNode.addListener(() {
+      if (_titleFocusNode.hasFocus) {
+        _animationController.forward();
+      } else {
+        _animationController.reverse();
+      }
+    });
   }
 
   @override
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _focusNode.dispose();
+    _titleFocusNode.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -79,10 +96,12 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
         }
       } catch (e) {
         if (mounted) {
+          final theme = Theme.of(context);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error: $e'),
-              backgroundColor: Colors.red.shade400,
+              content: Text('Error: $e',
+                  style: TextStyle(color: theme.colorScheme.onError)),
+              backgroundColor: theme.colorScheme.error,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
@@ -97,302 +116,277 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // --- BACKGROUND DECORATION (Tạo chiều sâu) ---
-          _buildBackgroundDecoration(),
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-          // --- MAIN CONTENT ---
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0, vertical: 40.0),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
+    return Scaffold(
+      // Giữ true để scaffold tự động điều chỉnh, nhưng chúng ta sẽ xử lý padding chi tiết hơn ở bên trong
+      resizeToAvoidBottomInset: true,
+      backgroundColor: colorScheme.background,
+      body: SafeArea(
+        // SafeArea bao bên ngoài để tránh lỗi tính toán padding lồng nhau
+        top: true,
+        bottom: false,
+        child: Column(
+          children: [
+            // --- 1. HEADER (Sử dụng Flexible thay vì Expanded) ---
+            // Flexible cho phép header co lại khi cần thiết thay vì cố định tỷ lệ
+            Flexible(
+              child: Container(
+                // Giữ chiều cao tối đa khoảng 35% màn hình, nhưng có thể co lại
+                height: MediaQuery.of(context).size.height * 0.35,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark
+                        ? [
+                            colorScheme.primary,
+                            const Color(0xFF0F172A),
+                          ]
+                        : [
+                            colorScheme.primary,
+                            colorScheme.secondary,
+                          ],
+                  ),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header nhỏ phía trên
-                      Text(
-                        'Create New',
-                        style: TextStyle(
-                          fontSize: 13,
-                          letterSpacing: 2.0,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w700,
-                          textBaseline: TextBaseline.alphabetic,
+                      // Nút đóng
+                      IconButton(
+                        onPressed: () => context.pop(),
+                        icon: Icon(Icons.close_rounded,
+                            color: colorScheme.onPrimary),
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              colorScheme.onPrimary.withOpacity(0.1),
                         ),
                       ),
-                      const SizedBox(height: 16),
-
-                      // CARD CHÍNH
-                      _buildMainCard(),
+                      const Spacer(),
+                      // Tiêu đề
+                      Text(
+                        'New Collection',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          color: colorScheme.onPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Organize your thoughts in style.',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: colorScheme.onPrimary.withOpacity(0.8),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildBackgroundDecoration() {
-    return Positioned.fill(
-      child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFF3F4F6), Color(0xFFE5E7EB)],
-          ),
-        ),
-        child: Stack(
-          children: [
-            // Vòng tròn mờ phía trên bên trái
-            Positioned(
-              top: -50,
-              left: -50,
+            // --- 2. FORM NỘI DUNG ---
+            // Expanded chiếm phần không gian còn lại
+            Expanded(
               child: Container(
-                width: 250,
-                height: 250,
+                width: double.infinity,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                  color: colorScheme.background,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(32),
+                    topRight: Radius.circular(32),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.shadow.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, -5),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-            // Vòng tròn mờ phía dưới bên phải
-            Positioned(
-              bottom: -80,
-              right: -80,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF8B5CF6).withOpacity(0.1),
+                child: SingleChildScrollView(
+                  // QUAN TRỌNG: Thêm padding dưới cùng bằng chiều cao bàn phím
+                  // để nội dung không bị che khuất khi bàn phím hiện ra
+                  padding: EdgeInsets.only(
+                    left: 32,
+                    right: 32,
+                    top: 40,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // --- LABEL ---
+                        Text(
+                          'Notebook Name',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // --- TITLE INPUT ---
+                        TextFormField(
+                          controller: _titleController,
+                          focusNode: _titleFocusNode,
+                          enabled: !_isLoading,
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'e.g. Project Alpha',
+                            hintStyle: theme.textTheme.headlineMedium?.copyWith(
+                              color: colorScheme.onSurface.withOpacity(0.2),
+                              fontWeight: FontWeight.w300,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          validator: (value) => value!.trim().isEmpty
+                              ? 'Please enter a name'
+                              : null,
+                        ),
+
+                        // Animated Indicator Line
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8.0),
+                          child: AnimatedBuilder(
+                            animation: _widthAnimation,
+                            builder: (context, child) {
+                              return FractionallySizedBox(
+                                widthFactor: _widthAnimation.value,
+                                alignment: Alignment.centerLeft,
+                                child: Container(
+                                  height: 4,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.secondary,
+                                    borderRadius: BorderRadius.circular(2),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+
+                        const SizedBox(height: 40),
+
+                        // --- LABEL ---
+                        Text(
+                          'Description',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // --- DESCRIPTION INPUT ---
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surface,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: colorScheme.outline.withOpacity(0.2),
+                              width: 1,
+                            ),
+                          ),
+                          child: TextFormField(
+                            controller: _descriptionController,
+                            enabled: !_isLoading,
+                            maxLines: 5,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: colorScheme.onSurface,
+                            ),
+                            decoration: InputDecoration(
+                              hintText: 'What is this notebook about?',
+                              hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurface.withOpacity(0.4),
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 40),
+
+                        // --- CREATE BUTTON ---
+                        SizedBox(
+                          width: double.infinity,
+                          height: 64,
+                          child: _isLoading
+                              ? Container(
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceVariant,
+                                    borderRadius: BorderRadius.circular(32),
+                                  ),
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                        color: colorScheme.primary),
+                                  ),
+                                )
+                              : ElevatedButton(
+                                  onPressed: _hasText ? _submitForm : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: colorScheme.primary,
+                                    foregroundColor: colorScheme.onPrimary,
+                                    elevation: _hasText ? 8 : 0,
+                                    shadowColor:
+                                        colorScheme.primary.withOpacity(0.4),
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(32),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'Create Notebook',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: _hasText
+                                              ? Colors.white
+                                              : colorScheme.onSurface
+                                                  .withOpacity(0.4),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Icon(
+                                        Icons.arrow_forward_rounded,
+                                        color: _hasText
+                                            ? Colors.white
+                                            : colorScheme.onSurface
+                                                .withOpacity(0.4),
+                                      )
+                                    ],
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildMainCard() {
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 500),
-      tween: Tween(begin: 0, end: 1),
-      builder: (context, value, child) {
-        return Transform.translate(
-          offset: Offset(0, 20 * (1 - value)),
-          child: Opacity(
-            opacity: value,
-            child: Container(
-              padding: const EdgeInsets.all(32.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 30,
-                    offset: const Offset(0, 15),
-                  ),
-                  BoxShadow(
-                    color: Colors.white.withOpacity(0.8),
-                    blurRadius: 5,
-                    spreadRadius: -5, // Tạo viền sáng nội bộ
-                  ),
-                ],
-              ),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // --- ICON ---
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          gradient: _primaryGradient,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF6366F1).withOpacity(0.3),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            )
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.menu_book_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // --- TITLE INPUT ---
-                    TextFormField(
-                      controller: _titleController,
-                      focusNode: _focusNode,
-                      autofocus: true,
-                      enabled: !_isLoading,
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.black87,
-                        height: 1.2,
-                        letterSpacing: -0.5,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Notebook Name',
-                        hintStyle: TextStyle(
-                          color: Colors.grey.shade300,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 32,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      validator: (value) => value!.trim().isEmpty ? ' ' : null,
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // Thanh gạch chân (Indicator)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      height: 3,
-                      width: _focusNode.hasFocus ? 60 : 0, // Thay đổi chiều dài
-                      decoration: BoxDecoration(
-                        gradient: _primaryGradient,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // --- DESCRIPTION INPUT (Styled Box) ---
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC), // Xanh xám rất nhạt
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.grey.shade100,
-                          width: 1,
-                        ),
-                      ),
-                      child: TextFormField(
-                        controller: _descriptionController,
-                        enabled: !_isLoading,
-                        maxLines: 3,
-                        minLines: 1,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Colors.black87,
-                          height: 1.5,
-                        ),
-                        decoration: InputDecoration(
-                          hintText: 'Add a description...',
-                          hintStyle: TextStyle(
-                            color: Colors.grey.shade400,
-                            fontSize: 15,
-                          ),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 40),
-
-                    // --- ACTION BUTTON ---
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: _isLoading
-                          ? Container(
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 28,
-                                  height: 28,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 3, color: Color(0xFF6366F1)),
-                                ),
-                              ),
-                            )
-                          : GestureDetector(
-                              onTap: (_hasText && !_isLoading)
-                                  ? _submitForm
-                                  : null,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
-                                decoration: BoxDecoration(
-                                  gradient: _hasText ? _primaryGradient : null,
-                                  color: _hasText ? null : Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: _hasText
-                                      ? [
-                                          BoxShadow(
-                                            color: const Color(0xFF6366F1)
-                                                .withOpacity(0.4),
-                                            blurRadius: 20,
-                                            offset: const Offset(0, 10),
-                                          )
-                                        ]
-                                      : null,
-                                ),
-                                child: Center(
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'Create Notebook',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: _hasText
-                                              ? Colors.white
-                                              : Colors.grey.shade400,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Icon(
-                                        Icons.arrow_forward_rounded,
-                                        size: 20,
-                                        color: _hasText
-                                            ? Colors.white
-                                            : Colors.grey.shade400,
-                                      )
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }
