@@ -1,4 +1,5 @@
 from ..models.chunk_model import Chunk
+
 class ChunkController:
     @staticmethod
     def create_chunk(user_id, folder_id, file_id, chunk_index, text, embedding):
@@ -14,3 +15,8 @@ class ChunkController:
         )
         chunk.save()
         return {"id": str(chunk.id), "chunk_index": chunk.chunk_index}, 201
+    @staticmethod
+    def get_chunks_by_folder(folder_id):
+        chunks = Chunk.objects(folder_id=folder_id)
+        chunk_list = [{"id": str(chunk.id), "chunk_index": chunk.chunk_index, "text": chunk.text, "embedding": chunk.embedding, "created_at": chunk.created_at.isoformat()} for chunk in chunks]
+        return chunk_list, 200

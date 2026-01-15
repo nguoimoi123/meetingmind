@@ -29,7 +29,7 @@ def upload_file():
     return jsonify(response), status
 
 '''
-curl http://127.0.0.1:5000/file/folder/696530c8c738274d1d321ab6
+curl http://127.0.0.1:5000/file/folder/6965381de947b96faf03a7ac
 '''
 @file_bp.route("/folder/<folder_id>", methods=["GET"])
 def get_files_by_folder(folder_id):

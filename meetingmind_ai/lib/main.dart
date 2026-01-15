@@ -27,7 +27,15 @@ import 'screens/meeting/in_meeting_screen.dart';
 import 'screens/meeting/post_meeting_summary_screen.dart';
 import 'screens/notebook/notebook_detail_screen.dart';
 
-void main() {
+import 'screens/notebook/create_notebook_screen.dart';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await dotenv.load(fileName: ".env");
+
   runApp(
     MultiProvider(
       providers: [
@@ -119,6 +127,10 @@ class MyApp extends StatelessWidget {
               path: '/app/profile',
               builder: (_, __) => const ProfileScreen(),
             ),
+            GoRoute(
+              path: '/create_notebook',
+              builder: (context, state) => const CreateNotebookScreen(),
+            ),
           ],
         ),
 
@@ -134,8 +146,11 @@ class MyApp extends StatelessWidget {
         ),
 
         GoRoute(
-          path: '/notebook_detail',
-          builder: (_, __) => const NotebookDetailScreen(),
+          path: '/notebook_detail/:folderId',
+          builder: (context, state) {
+            final folderId = state.pathParameters['folderId']!;
+            return NotebookDetailScreen(folderId: folderId);
+          },
         ),
       ],
     );
