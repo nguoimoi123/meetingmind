@@ -109,21 +109,40 @@ class LoginScreen extends StatelessWidget {
                 const SizedBox(height: 12),
 
                 // Social Login
+                // Social Login
                 OutlinedButton.icon(
                   onPressed: () async {
                     final googleAuth = GoogleAuthService();
+
+                    // 1. Lấy ID Token từ Google
                     final idToken = await googleAuth.loginWithGoogle();
 
-                    if (idToken == null) return;
+                    if (idToken != null) {
+                      print("Got ID Token, sending to backend...");
 
-                    final success =
-                        await googleAuth.sendTokenToBackend(idToken);
+                      // 2. Gửi Token lên Backend để lưu DB
+                      final isSuccess =
+                          await googleAuth.sendTokenToBackend(idToken);
 
-                    if (success && context.mounted) {
-                      Provider.of<AuthProvider>(context, listen: false).login();
-                      context.go('/app/home');
+                      if (isSuccess) {
+                        // 3. Nếu lưu thành công -> Login & Chuyển trang
+                        Provider.of<AuthProvider>(context, listen: false)
+                            .login();
+                        context.go('/app/home');
+                      } else {
+                        // Xử lý khi backend lỗi
+                        print("Lỗi khi gửi token lên backend");
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  "Đăng nhập thất bại, không thể lưu dữ liệu.")),
+                        );
+                      }
+                    } else {
+                      print("User hủy đăng nhập Google");
                     }
                   },
+                  // ... (icon, label giữ nguyên)
                   icon: Image.network(
                     'https://www.google.com/favicon.ico',
                     height: 18,
@@ -131,6 +150,7 @@ class LoginScreen extends StatelessWidget {
                   ),
                   label: const Text('Continue with Google'),
                 ),
+
                 const SizedBox(height: 8),
 
                 OutlinedButton.icon(

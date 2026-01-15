@@ -105,7 +105,7 @@ class MyApp extends StatelessWidget {
           routes: [
             GoRoute(
               path: '/app/home',
-              builder: (_, __) => const DashboardScreen(),
+              builder: (_, __) => DashboardScreen(),
             ),
             GoRoute(
               path: '/app/notebooks',

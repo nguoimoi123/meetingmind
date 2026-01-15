@@ -3,25 +3,52 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 
 class GoogleAuthService {
+  // 🔴 PHẢI TRÙNG GOOGLE_CLIENT_ID BACKEND
+  static const String _webClientId =
+      "828381156455-k2cht1g24gd4mv8nva7d19r5gh4hje85.apps.googleusercontent.com";
+
+  static const String _backendUrl = "http://192.168.239.243:5000/auth/google";
+  // Android emulator → 10.0.2.2
+  // iOS simulator → http://localhost:5000
+
   final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: _webClientId,
     scopes: ['email', 'profile'],
   );
 
+  /// Step 1: Login Google → lấy ID TOKEN
   Future<String?> loginWithGoogle() async {
-    final account = await _googleSignIn.signIn();
-    if (account == null) return null;
+    try {
+      final account = await _googleSignIn.signIn();
+      if (account == null) return null;
 
-    final auth = await account.authentication;
-    return auth.idToken;
+      final auth = await account.authentication;
+      return auth.idToken; // 🔥 QUAN TRỌNG
+    } catch (e) {
+      print("Google login error: $e");
+      return null;
+    }
   }
 
+  /// Step 2: Gửi ID TOKEN lên backend
   Future<bool> sendTokenToBackend(String idToken) async {
-    final res = await http.post(
-      Uri.parse('http://10.0.2.2:5000/auth/google'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'id_token': idToken}),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse(_backendUrl),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"id_token": idToken}),
+      );
 
-    return res.statusCode == 200;
+      if (response.statusCode == 200) {
+        print("Backend login success: ${response.body}");
+        return true;
+      } else {
+        print("Backend error: ${response.body}");
+        return false;
+      }
+    } catch (e) {
+      print("Backend connection error: $e");
+      return false;
+    }
   }
 }

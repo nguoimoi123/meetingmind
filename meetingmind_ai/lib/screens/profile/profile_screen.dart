@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:provider/provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -177,8 +179,13 @@ class ProfileScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16.0, 24.0, 16.0, 32.0),
               child: OutlinedButton(
-                onPressed: () {
-                  // TODO: Logic đăng xuất
+                onPressed: () async {
+                  // Gọi AuthProvider để logout
+                  final authProvider =
+                      Provider.of<AuthProvider>(context, listen: false);
+                  await authProvider.logout();
+
+                  // Điều hướng về màn hình Login
                   context.go('/login');
                 },
                 style: OutlinedButton.styleFrom(
