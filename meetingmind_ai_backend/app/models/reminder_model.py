@@ -6,12 +6,12 @@ class Reminder(db.Document):
     user_id = db.StringField(required=True)
 
     title = db.StringField(required=True)
-    
-    description = db.StringField()
-    
-    remind_at = db.DateTimeField(required=True)
-    
-    created_at = db.DateTimeField(default=datetime.utcnow)
+
+    remind_start = db.DateTimeField(required=True)
+
+    remind_end = db.DateTimeField(required=True)
+
+    location = db.StringField()
     
     done = db.BooleanField(default=False)
 
