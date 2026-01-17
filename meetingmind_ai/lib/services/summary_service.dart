@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/meeting_summary.dart';
 
 class SummaryService {
-  static const String _baseUrl = 'http://192.168.115.243:5000';
+  static const String _baseUrl = 'http://192.168.178.243:5000';
 
   static Future<MeetingSummary> summarize(String sid) async {
     final uri = Uri.parse('$_baseUrl/summarize/$sid');

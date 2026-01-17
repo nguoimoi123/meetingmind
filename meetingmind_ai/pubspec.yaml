@@ -46,6 +46,7 @@ dependencies:
   livekit_client: ^2.6.1
   socket_io_client: ^2.0.0 # Để kết nối với flask_socketio
   record: ^5.0.0
+  docx_to_text: ^1.0.0
 
 dev_dependencies:
   flutter_test:

@@ -7,7 +7,7 @@ class MeetingService {
   String? meetingSid;
   // Thay đổi IP này thành địa chỉ IP của máy chạy Server Python
 
-  static const String _serverUrl = 'http://192.168.115.243:5000';
+  static const String _serverUrl = 'http://192.168.178.243:5000';
 
   IO.Socket? _socket;
   final StreamController<TranscriptMessage> _transcriptController =

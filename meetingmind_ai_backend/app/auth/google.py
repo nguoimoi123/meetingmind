@@ -35,6 +35,7 @@ def google_login():
 
         return jsonify({
             "message": "Login success",
+            "user_id": str(user.id),
             "email": email,
             "name": name,
             "avatar": avatar

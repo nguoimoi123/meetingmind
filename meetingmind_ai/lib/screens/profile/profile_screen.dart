@@ -183,7 +183,7 @@ class ProfileScreen extends StatelessWidget {
                   // Gọi AuthProvider để logout
                   final authProvider =
                       Provider.of<AuthProvider>(context, listen: false);
-                  await authProvider.logout();
+                  //await authProvider.logout();
 
                   // Điều hướng về màn hình Login
                   context.go('/login');

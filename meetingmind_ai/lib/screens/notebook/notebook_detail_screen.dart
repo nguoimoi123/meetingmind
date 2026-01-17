@@ -1,179 +1,276 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:docx_to_text/docx_to_text.dart';
 
-class NotebookDetailScreen extends StatelessWidget {
-  const NotebookDetailScreen({super.key});
+import 'package:meetingmind_ai/services/file_service.dart';
+import 'package:meetingmind_ai/services/chat_service.dart';
+import 'package:provider/provider.dart';
+import 'package:meetingmind_ai/providers/auth_provider.dart';
+
+class FileItem {
+  String id;
+  String name;
+  int size;
+  String uploadDate;
+
+  FileItem({
+    required this.id,
+    required this.name,
+    required this.size,
+    required this.uploadDate,
+  });
+
+  factory FileItem.fromJson(Map<String, dynamic> json) {
+    return FileItem(
+      id: json['id'],
+      name: json['filename'],
+      size: json['size'],
+      uploadDate: json['uploaded_at'],
+    );
+  }
+}
+
+// ======================= MAIN =========================
+
+class NotebookDetailScreen extends StatefulWidget {
+  final String folderId;
+  const NotebookDetailScreen({super.key, required this.folderId});
+
+  @override
+  State<NotebookDetailScreen> createState() => _NotebookDetailScreenState();
+}
+
+class _NotebookDetailScreenState extends State<NotebookDetailScreen> {
+  String _folderName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFolderInfo();
+  }
+
+  Future<void> _fetchFolderInfo() async {
+    final data = await FileService.getFolder(widget.folderId);
+    setState(() => _folderName = data['folder_name']);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Marketing Strategy 2024'),
-          actions: [
-            IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
-          ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Sources'),
-              Tab(text: 'Ask AI'),
-            ],
-          ),
-        ),
-        body: const TabBarView(
+        backgroundColor: colorScheme.background,
+        body: Column(
           children: [
-            SourcesTab(),
-            AskAITab(),
+            _buildHeader(context, theme, colorScheme),
+            _buildTabBar(theme, colorScheme),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  SourcesTab(folderId: widget.folderId),
+                  AskAITab(folderId: widget.folderId),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildHeader(BuildContext context, ThemeData theme, ColorScheme cs) {
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+        child: Row(
+          children: [
+            IconButton(
+              icon: Icon(Icons.arrow_back_ios_new_rounded, color: cs.onSurface),
+              onPressed: () => Navigator.pop(context),
+            ),
+            const SizedBox(width: 20),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Notebook',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.primary, fontWeight: FontWeight.bold)),
+              Text(_folderName.isNotEmpty ? _folderName : 'Loading...',
+                  style: theme.textTheme.headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+            ])
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabBar(ThemeData theme, ColorScheme cs) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      height: 50,
+      decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(25)),
+      child: const TabBar(tabs: [
+        Tab(text: 'Sources'),
+        Tab(text: 'Ask AI'),
+      ]),
+    );
+  }
 }
 
-class SourcesTab extends StatelessWidget {
-  const SourcesTab({super.key});
+// ======================= TAB SOURCES =========================
+
+class SourcesTab extends StatefulWidget {
+  final String folderId;
+  const SourcesTab({super.key, required this.folderId});
+
+  @override
+  State<SourcesTab> createState() => _SourcesTabState();
+}
+
+class _SourcesTabState extends State<SourcesTab> {
+  bool _isLoading = true;
+  bool _isUploading = false;
+  List<FileItem> _files = [];
+  late String _userId;
+  @override
+  void initState() {
+    super.initState();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    _userId = auth.userId!;
+    _fetchFiles();
+  }
+
+  Future<void> _fetchFiles() async {
+    final data = await FileService.getFolder(widget.folderId);
+    final List list = data['files'] ?? [];
+    setState(() {
+      _files = list.map((e) => FileItem.fromJson(e)).toList();
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _pickAndUploadFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['docx', 'txt', 'md'],
+    );
+    if (result == null) return;
+
+    final file = result.files.single;
+    final content = await _readFile(file);
+    if (content == null || content.isEmpty) return;
+
+    setState(() => _isUploading = true);
+
+    await FileService.uploadFile(
+      userId: _userId,
+      folderId: widget.folderId,
+      file: file,
+      content: content,
+    );
+
+    await _fetchFiles();
+    setState(() => _isUploading = false);
+  }
+
+  Future<String?> _readFile(PlatformFile file) async {
+    if (file.path == null) return null;
+    if (file.extension == 'docx') {
+      final bytes = await File(file.path!).readAsBytes();
+      return docxToText(bytes);
+    }
+    return await File(file.path!).readAsString();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: 5,
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(24, 10, 24, 100),
+      itemCount: _files.length + 1,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        return ListTile(
-          leading: const Icon(Icons.insert_drive_file),
-          title: Text('Document ${index + 1}'),
-          subtitle:
-              Text('Added on: ${DateTime.now().day}/${DateTime.now().month}'),
-        );
+        if (index == _files.length) {
+          return ElevatedButton(
+            onPressed: _isUploading ? null : _pickAndUploadFile,
+            child: const Text('Add New Document'),
+          );
+        }
+        return ListTile(title: Text(_files[index].name));
       },
     );
   }
 }
 
-class AskAITab extends StatelessWidget {
-  const AskAITab({super.key});
+// ======================= TAB ASK AI =========================
 
-  // Widget helper để tạo một tin nhắn
-  Widget _buildMessage(String sender, String text, BuildContext context,
-      {required bool isUser}) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
+class AskAITab extends StatefulWidget {
+  final String folderId;
+  const AskAITab({super.key, required this.folderId});
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-      child: Row(
-        mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          if (!isUser) ...[
-            const CircleAvatar(child: Icon(Icons.smart_toy)),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isUser ? colorScheme.primary : theme.cardColor,
-                borderRadius: BorderRadius.circular(12).copyWith(
-                  bottomLeft: isUser
-                      ? const Radius.circular(12)
-                      : const Radius.circular(0),
-                  bottomRight: isUser
-                      ? const Radius.circular(0)
-                      : const Radius.circular(12),
-                ),
-              ),
-              child: Text(text,
-                  style: TextStyle(
-                      color: isUser
-                          ? Colors.white
-                          : theme.textTheme.bodyLarge?.color)),
-            ),
-          ),
-          if (isUser) ...[
-            const SizedBox(width: 8),
-            const CircleAvatar(
-                backgroundImage:
-                    NetworkImage('https://i.pravatar.cc/150')), // User avatar
-          ],
-        ],
-      ),
+  @override
+  State<AskAITab> createState() => _AskAITabState();
+}
+
+class _AskAITabState extends State<AskAITab> {
+  final List<ChatMessage> _messages = [];
+  final TextEditingController _textController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _sendMessage(dynamic auth) async {
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _messages.add(ChatMessage(text: text, isUser: true));
+      _isLoading = true;
+      _textController.clear();
+    });
+
+    final answer = await ChatService.ask(
+      folderId: widget.folderId,
+      question: text,
+      userId: auth.userId!,
     );
+
+    setState(() {
+      _messages.add(ChatMessage(text: answer, isUser: false));
+      _isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
-
-    return Column(
-      children: [
-        Expanded(
-          child: ListView(
-            children: [
-              const SizedBox(height: 16),
-              _buildMessage(
-                  'AI',
-                  'Hi, I\'m your AI assistant. Ask me anything about the documents in this notebook.',
-                  context,
-                  isUser: false),
-              _buildMessage('You',
-                  'Summarize the key takeaways from the weekly sync', context,
-                  isUser: true),
-              _buildMessage(
-                  'AI',
-                  'The key takeaways from the weekly sync are:\n- Project Alpha is on track.\n- Budget concerns were raised for Q4.\n- The marketing campaign launch is delayed by one week.',
-                  context,
-                  isUser: false),
-            ],
-          ),
+    return Column(children: [
+      Expanded(
+        child: ListView.builder(
+          itemCount: _messages.length,
+          itemBuilder: (_, i) => ListTile(title: Text(_messages[i].text)),
         ),
-        _buildMessageInput(context, colorScheme),
-      ],
-    );
+      ),
+      Row(children: [
+        Expanded(child: TextField(controller: _textController)),
+        Consumer<AuthProvider>(
+          builder: (context, auth, _) => IconButton(
+            onPressed: () => _sendMessage(auth),
+            icon: const Icon(Icons.send),
+          ),
+        )
+      ])
+    ]);
   }
+}
 
-  Widget _buildMessageInput(BuildContext context, ColorScheme colorScheme) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Ask AI about this notebook...',
-                filled: true,
-                fillColor: colorScheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                suffixIcon:
-                    IconButton(icon: const Icon(Icons.mic), onPressed: () {}),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          FloatingActionButton(
-            onPressed: () {},
-            backgroundColor: colorScheme.primary,
-            child: const Icon(Icons.arrow_upward, color: Colors.white),
-          ),
-        ],
-      ),
-    );
-  }
+class ChatMessage {
+  final String text;
+  final bool isUser;
+  ChatMessage({required this.text, required this.isUser});
 }

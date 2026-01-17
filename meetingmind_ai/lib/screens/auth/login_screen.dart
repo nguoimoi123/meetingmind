@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/services/google_auth_service.dart';
@@ -87,8 +88,7 @@ class LoginScreen extends StatelessWidget {
                       // ==============================
 
                       // Hiện tại: bỏ qua kiểm tra, vào app luôn
-                      Provider.of<AuthProvider>(context, listen: false).login();
-                      context.go('/app/home');
+                      context.read<AuthProvider>().login(); // chỉ set state
                     },
                     child: const Text('Log In'),
                   ),
@@ -114,34 +114,30 @@ class LoginScreen extends StatelessWidget {
                   onPressed: () async {
                     final googleAuth = GoogleAuthService();
 
-                    // 1. Lấy ID Token từ Google
                     final idToken = await googleAuth.loginWithGoogle();
 
                     if (idToken != null) {
                       print("Got ID Token, sending to backend...");
 
-                      // 2. Gửi Token lên Backend để lưu DB
-                      final isSuccess =
+                      final userId =
                           await googleAuth.sendTokenToBackend(idToken);
 
-                      if (isSuccess) {
-                        // 3. Nếu lưu thành công -> Login & Chuyển trang
+                      if (userId != null) {
                         Provider.of<AuthProvider>(context, listen: false)
-                            .login();
-                        context.go('/app/home');
+                            .loginWithGoogle(
+                          user: await GoogleSignIn().signInSilently(),
+                          userIdFromBackend: userId,
+                        );
+                        context.go('/app/home'); // 🚀 Chuyển trang
                       } else {
-                        // Xử lý khi backend lỗi
-                        print("Lỗi khi gửi token lên backend");
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                              content: Text(
-                                  "Đăng nhập thất bại, không thể lưu dữ liệu.")),
+                              content: Text("Đăng nhập thất bại từ backend")),
                         );
                       }
-                    } else {
-                      print("User hủy đăng nhập Google");
                     }
                   },
+
                   // ... (icon, label giữ nguyên)
                   icon: Image.network(
                     'https://www.google.com/favicon.ico',

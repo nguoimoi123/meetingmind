@@ -27,6 +27,8 @@ import 'screens/meeting/in_meeting_screen.dart';
 import 'screens/meeting/post_meeting_summary_screen.dart';
 import 'screens/notebook/notebook_detail_screen.dart';
 
+import 'screens/notebook/create_notebook_screen.dart';
+
 void main() {
   runApp(
     MultiProvider(
@@ -119,6 +121,10 @@ class MyApp extends StatelessWidget {
               path: '/app/profile',
               builder: (_, __) => const ProfileScreen(),
             ),
+            GoRoute(
+              path: '/create_notebook',
+              builder: (context, state) => const CreateNotebookScreen(),
+            ),
           ],
         ),
 
@@ -139,8 +145,11 @@ class MyApp extends StatelessWidget {
           },
         ),
         GoRoute(
-          path: '/notebook_detail',
-          builder: (_, __) => const NotebookDetailScreen(),
+          path: '/notebook_detail/:folderId',
+          builder: (context, state) {
+            final folderId = state.pathParameters['folderId']!;
+            return NotebookDetailScreen(folderId: folderId);
+          },
         ),
       ],
     );
