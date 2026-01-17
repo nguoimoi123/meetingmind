@@ -3,9 +3,11 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../models/meeting_models.dart';
 
 class MeetingService {
+  IO.Socket get socket => _socket!;
+  String? meetingSid;
   // Thay đổi IP này thành địa chỉ IP của máy chạy Server Python
-  // Ví dụ: 'http://192.168.1.5:5000'
-  static const String _serverUrl = 'http://192.168.239.243:5000';
+
+  static const String _serverUrl = 'http://192.168.115.243:5000';
 
   IO.Socket? _socket;
   final StreamController<TranscriptMessage> _transcriptController =
@@ -34,6 +36,8 @@ class MeetingService {
     _socket!.connect();
 
     _socket!.on('connect', (_) {
+      meetingSid = socket.id;
+      print("🆔 Socket SID = $meetingSid");
       print('Connected to Server');
       _statusController.add('Connected');
     });

@@ -37,6 +37,7 @@ class _InMeetingScreenState extends State<InMeetingScreen> {
 
     // 3. Lắng nghe kết quả trả về từ Server
     _meetingService.transcriptStream.listen((message) {
+      print("📥 Nhận: ${message.speaker}: ${message.text}");
       if (!message.isFinal) return;
       if (mounted) {
         setState(() {
@@ -199,9 +200,19 @@ class _InMeetingScreenState extends State<InMeetingScreen> {
 
           TextButton.icon(
             onPressed: () {
-              _stopRecording(); // Dừng mic
-              _meetingService.stopStreaming(); // Dừng socket
-              context.pushReplacement('/post_summary');
+              _stopRecording();
+              _meetingService.stopStreaming();
+
+              final sid = _meetingService.meetingSid;
+              print("➡️ Navigate to Summary with SID = $sid");
+
+              if (sid != null) {
+                context.go('/post_summary/$sid');
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Chưa có SID cuộc họp")),
+                );
+              }
             },
             icon: const Icon(Icons.stop_circle),
             label: const Text('End'),

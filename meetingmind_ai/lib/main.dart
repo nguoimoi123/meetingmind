@@ -129,10 +129,15 @@ class MyApp extends StatelessWidget {
         ),
 
         GoRoute(
-          path: '/post_summary',
-          builder: (_, __) => const PostMeetingSummaryScreen(),
+          path: '/post_summary/:sid',
+          builder: (context, state) {
+            final sid = state.pathParameters['sid']!;
+            return PostMeetingSummaryScreen(
+              meetingSid: sid,
+              transcripts: [],
+            );
+          },
         ),
-
         GoRoute(
           path: '/notebook_detail',
           builder: (_, __) => const NotebookDetailScreen(),

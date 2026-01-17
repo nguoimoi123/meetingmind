@@ -1,138 +1,64 @@
 import 'package:flutter/material.dart';
+import 'package:meetingmind_ai/models/meeting_models.dart';
+import 'package:meetingmind_ai/services/summary_service.dart';
+import 'package:meetingmind_ai/models/meeting_summary.dart';
 
-class PostMeetingSummaryScreen extends StatelessWidget {
-  const PostMeetingSummaryScreen({super.key});
+class PostMeetingSummaryScreen extends StatefulWidget {
+  final String meetingSid;
+  final List<TranscriptMessage> transcripts;
+  const PostMeetingSummaryScreen(
+      {super.key, required this.transcripts, required this.meetingSid});
 
-  // Widget helper để tạo các ô mở rộng
-  Widget _buildExpansionTile(
-      BuildContext context, String title, String content, IconData icon) {
-    final ThemeData theme = Theme.of(context);
+  @override
+  State<PostMeetingSummaryScreen> createState() =>
+      _PostMeetingSummaryScreenState();
+}
 
-    return ExpansionTile(
-      leading: Icon(icon, color: theme.colorScheme.primary),
-      title: Text(
-        title,
-        style:
-            theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-      ),
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-          child: Text(
-            content,
-            style: theme.textTheme.bodyMedium,
-          ),
-        )
-      ],
-    );
+class _PostMeetingSummaryScreenState extends State<PostMeetingSummaryScreen> {
+  MeetingSummary? summary;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final result = await SummaryService.summarize(widget.meetingSid);
+    setState(() => summary = result);
   }
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final ColorScheme colorScheme = theme.colorScheme;
+    if (summary == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Meeting Summary',
-          style: theme.textTheme.headlineSmall,
-        ),
-      ),
-      body: Column(
+      appBar: AppBar(title: const Text('Meeting Summary')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          // Phần tiêu đề cuộc họp
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Q4 Product Strategy Review',
-                  style: theme.textTheme.headlineMedium,
-                ),
-                Text(
-                  'Dec 15, 2023 ・ 10:00 AM',
-                  style: theme.textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-          // Danh sách các phần nội dung
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              children: [
-                _buildExpansionTile(
-                  context,
-                  'Summary',
-                  'This meeting covered the Q4 product strategy, focusing on the new marketing campaign budget, which was approved. Key discussion points included the timeline for the next feature launch, which has been postponed to Q1 2024.',
-                  Icons.description,
-                ),
-                _buildExpansionTile(
-                  context,
-                  'Action Items',
-                  '1. Finalize Q4 budget (Assignee: Alex, Due: Dec 20)\n2. Draft user survey for new feature feedback (Assignee: Sam, Due: Dec 22)',
-                  Icons.task_alt,
-                ),
-                _buildExpansionTile(
-                  context,
-                  'Key Decisions',
-                  '1. Approved the new marketing campaign budget.\n2. Postponed the feature launch to Q1 2024.',
-                  Icons.lightbulb,
-                ),
-                _buildExpansionTile(
-                  context,
-                  'Full Transcript',
-                  'A complete, word-for-word record of the meeting is available for review.',
-                  Icons.forum,
-                ),
-              ],
-            ),
-          ),
+          _tile('Summary', summary!.summary),
+          _tile('Action Items', summary!.actionItems.join('\n')),
+          _tile('Key Decisions', summary!.keyDecisions.join('\n')),
+          _tile('Full Transcript', summary!.fullTranscript),
         ],
       ),
-      // Thanh nút ở dưới cùng
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16.0),
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  // TODO: Logic chia sẻ
-                },
-                icon: const Icon(Icons.share),
-                label: const Text('Share Summary'),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: Logic thêm vào lịch
-                },
-                icon: const Icon(Icons.calendar_month),
-                label: const Text('Add to Calendar'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    );
+  }
+
+  Widget _tile(String title, String content) {
+    return ExpansionTile(
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: Text(content),
+        )
+      ],
     );
   }
 }
