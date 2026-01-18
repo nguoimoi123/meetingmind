@@ -20,11 +20,21 @@ Transcript:
     res = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.3
+        temperature=0.2
     )
 
-    content = res.choices[0].message.content.strip()
-    if content.startswith("```"):
-        content = content.replace("```json", "").replace("```", "").strip()
+    raw = res.choices[0].message.content.strip()
 
-    return json.loads(content)
+    if not raw:
+        raise ValueError("OpenAI returned empty content")
+
+    # Nếu AI bọc JSON trong ```json ... ```
+    if raw.startswith("```"):
+        raw = raw.replace("```json", "").replace("```", "").strip()
+
+    try:
+        data = json.loads(raw)
+    except Exception as e:
+        raise ValueError(f"JSON parse failed: {e} | raw={raw}")
+
+    return data

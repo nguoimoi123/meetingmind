@@ -2,6 +2,13 @@
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
+// --- THÊM IMPORT NÀY ĐỂ SỬA LỖI GIỜ THÔNG BÁO ---
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+
+// --- IMPORT SERVICE THÔNG BÁO ---
+import 'services/notification_service.dart';
+
 // Providers
 import 'providers/theme_provider.dart';
 import 'providers/auth_provider.dart';
@@ -28,14 +35,28 @@ import 'screens/meeting/post_meeting_summary_screen.dart';
 import 'screens/notebook/notebook_detail_screen.dart';
 
 import 'screens/notebook/create_notebook_screen.dart';
+import 'screens/schedule/new_task_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 1. KHỞI TẠO TIMEZONE (Cực kỳ quan trọng để thông báo đúng giờ)
+  tz.initializeTimeZones();
+
+  // 2. KHỞI TẠO THÔNG BÁO
+  await NotificationService().initialize();
+
+  final authProvider = AuthProvider();
+  await authProvider.init();
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        // SỬA: Sử dụng .value và đưa vào danh sách providers, không lồng child ở đây
+        ChangeNotifierProvider.value(value: authProvider),
       ],
+      // SỬA: child chính của MultiProvider là MyApp
       child: const MyApp(),
     ),
   );
@@ -121,10 +142,17 @@ class MyApp extends StatelessWidget {
               path: '/app/profile',
               builder: (_, __) => const ProfileScreen(),
             ),
+            // Route tạo Notebook (đã có sẵn)
             GoRoute(
               path: '/create_notebook',
               builder: (context, state) => const CreateNotebookScreen(),
             ),
+            // <--- ROUTE TẠO TASK MỚI ---
+            GoRoute(
+              path: '/app/new_task',
+              builder: (context, state) => const NewTaskScreen(),
+            ),
+            // ---------------------------------
           ],
         ),
 
@@ -140,7 +168,6 @@ class MyApp extends StatelessWidget {
             final sid = state.pathParameters['sid']!;
             return PostMeetingSummaryScreen(
               meetingSid: sid,
-              transcripts: [],
             );
           },
         ),

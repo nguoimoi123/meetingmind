@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class NotebookListService {
-  static const String _baseUrl = 'http://192.168.178.243:5000';
+  static const String _baseUrl = 'http://192.168.122.243:5000';
   static Future<List<dynamic>> fetchFolders(String userId) async {
     const baseUrl = _baseUrl;
 

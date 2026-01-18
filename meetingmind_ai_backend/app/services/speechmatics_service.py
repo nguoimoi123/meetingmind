@@ -1,9 +1,11 @@
 import asyncio, json, queue, websockets
 from app.extensions import socketio
 from app.config import Config
+from app.services.meeting_service import append_transcript
 
-sessions = {}
-session_transcripts = {}
+# XÓA: sessions = {}, session_transcripts = {} 
+# (Giữ lại session_dict nếu cần quản lý queue worker riêng biệt, 
+# nhưng ở đây ta chỉ cần lưu DB nên bỏ bớt cho sạch)
 
 async def sm_worker(sid, audio_queue):
     headers = {"Authorization": f"Bearer {Config.SPEECHMATICS_API_KEY}"}
@@ -55,12 +57,16 @@ async def sm_worker(sid, audio_queue):
                             final_buffer = ""
                             if sentence:
                                 line = f"Người {speaker}: {sentence}"
-                                session_transcripts[sid].append(line)
+                                
+                                # Gửi UI
                                 socketio.emit("transcript_response",
                                               {"speaker": f"Người {speaker}",
                                                "text": sentence,
                                                "is_final": True},
                                               room=sid)
+                                
+                                # LƯU VÀO DATABASE (Mới thêm)
+                                append_transcript(sid, line)
 
         recv_task = asyncio.create_task(receive_loop())
 

@@ -1,13 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:http/http.dart' as http;
 import '../models/meeting_models.dart';
 
 class MeetingService {
   IO.Socket get socket => _socket!;
   String? meetingSid;
-  // Thay đổi IP này thành địa chỉ IP của máy chạy Server Python
 
-  static const String _serverUrl = 'http://192.168.178.243:5000';
+  static const String _serverUrl = 'http://192.168.122.243:5000';
 
   IO.Socket? _socket;
   final StreamController<TranscriptMessage> _transcriptController =
@@ -17,7 +18,9 @@ class MeetingService {
 
   bool _isRecording = false;
 
-  // Stream để UI lắng nghe
+  // User ID giả lập, thực tế lấy từ AuthService
+  final String _currentUserId = "user_123";
+
   Stream<TranscriptMessage> get transcriptStream =>
       _transcriptController.stream;
   Stream<String> get statusStream => _statusController.stream;
@@ -28,9 +31,11 @@ class MeetingService {
 
     print("Connecting to $_serverUrl...");
 
+    // Truyền user_id vào query params khi connect
     _socket = IO.io(_serverUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
+      'query': {'user_id': _currentUserId},
     });
 
     _socket!.connect();
@@ -51,10 +56,7 @@ class MeetingService {
       print('Server Status: ${data['msg']}');
     });
 
-    // Lắng nghe kết quả trả về từ Python (Speechmatics)
     _socket!.on('transcript_response', (data) {
-      print('[SERVICE] Raw data received: $data');
-      print('Received: $data');
       TranscriptMessage msg = TranscriptMessage.fromJson(data);
       _transcriptController.add(msg);
     });
@@ -70,46 +72,75 @@ class MeetingService {
     _socket = null;
   }
 
-  // Gửi sự kiện bắt đầu phiên họp
   void startStreaming() {
     _socket?.emit('start_streaming');
     _isRecording = true;
     _statusController.add('Recording started');
   }
 
-  // Gửi dữ liệu âm thanh (Bytes)
-  // Trong thực tế, bạn sẽ gọi hàm này từ một Stream thu âm Audio
   void sendAudioData(List<int> bytes) {
     if (_socket != null && _socket!.connected && _isRecording) {
       _socket!.emit('audio_data', bytes);
     }
   }
 
-  // Kết thúc phiên
   void stopStreaming() {
     _isRecording = false;
-    // Logic backend Python tự xử lý khi socket đóng hoặc ta có thể emit một event 'stop' tùy chỉnh
-    _socket?.disconnect(); // Hoặc gửi event stop tùy bạn
+    _socket?.disconnect();
     _statusController.add('Recording stopped');
   }
 
-  // Giả lập API lấy danh sách cuộc họp cũ (Vì code Python bạn chỉ có phần Live)
+  // API LẤY DANH SÁCH CỰA HỌP (Thay vì Mock)
   Future<List<Meeting>> getPastMeetings() async {
-    // Ở đây bạn nên gọi REST API thật. Vì chưa có nên trả về mock list
-    await Future.delayed(const Duration(milliseconds: 500));
-    return [
-      Meeting(
-          id: '1',
-          title: 'Q4 Marketing Strategy',
-          subtitle: '3 action items',
-          date: 'Oct 26, 2023',
-          status: 'Completed'),
-      Meeting(
-          id: '2',
-          title: 'Project Phoenix',
-          subtitle: 'Sync up',
-          date: 'Oct 25, 2023',
-          status: 'Completed'),
-    ];
+    final uri = Uri.parse('$_serverUrl/meetings?user_id=$_currentUserId');
+
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        return data.map((json) {
+          // Format lại ngày tháng cho đẹp
+          String dateStr = json['created_at'] ?? '';
+          return Meeting(
+            id: json['id'],
+            title: json['title'],
+            subtitle:
+                json['status'] == 'completed' ? 'Completed' : 'In Progress',
+            date: _formatDate(dateStr),
+            status: json['status'],
+          );
+        }).toList();
+      } else {
+        throw Exception('Server Error');
+      }
+    } catch (e) {
+      print("Error fetching meetings: $e");
+      return [];
+    }
+  }
+
+  String _formatDate(String isoDate) {
+    try {
+      DateTime date = DateTime.parse(isoDate);
+      return "${date.day}/${date.month}/${date.year}";
+    } catch (e) {
+      return "Unknown";
+    }
+  }
+
+  Future<void> deleteMeeting(String sid) async {
+    final uri = Uri.parse('$_serverUrl/meetings/$sid');
+
+    try {
+      final response =
+          await http.delete(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) {
+        throw Exception('Failed to delete meeting');
+      }
+    } catch (e) {
+      print("Error deleting meeting: $e");
+      throw e;
+    }
   }
 }
