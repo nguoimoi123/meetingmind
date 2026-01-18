@@ -3,60 +3,13 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
-import 'newtask.dart'; // Đảm bảo import file NewTaskScreen đã có nút delete
-
-// Model dữ liệu sự kiện
-class Event {
-  final String id;
-  final String title;
-  final String startTime;
-  final String endTime;
-  final String? location;
-  final Color colorTag;
-
-  Event({
-    required this.id,
-    required this.title,
-    required this.startTime,
-    required this.endTime,
-    this.location,
-    required this.colorTag,
-  });
-
-  factory Event.fromJson(Map<String, dynamic> json) {
-    DateTime start = DateTime.parse(json['remind_start']).toLocal();
-    DateTime end = DateTime.parse(json['remind_end']).toLocal();
-    final timeFormat = DateFormat('HH:mm');
-
-    final List<Color> availableColors = [
-      const Color(0xFF6366F1),
-      const Color(0xFFEC4899),
-      const Color(0xFF10B981),
-      const Color(0xFFF59E0B),
-      const Color(0xFF3B82F6),
-      const Color(0xFF8B5CF6),
-      const Color(0xFFEF4444),
-      const Color(0xFF14B8A6),
-    ];
-
-    final random = Random();
-    final Color randomColor =
-        availableColors[random.nextInt(availableColors.length)];
-
-    return Event(
-      id: json['id'] ?? '', // Đảm bảo lấy ID từ API
-      title: json['title'] ?? 'No Title',
-      startTime: timeFormat.format(start),
-      endTime: timeFormat.format(end),
-      location: json['location'],
-      colorTag: randomColor,
-    );
-  }
-}
+import 'package:meetingmind_ai/models/event_model.dart';
+import 'package:meetingmind_ai/services/reminder_service.dart';
+import 'package:meetingmind_ai/services/notification_service.dart';
+import 'new_task_screen.dart';
+import '../../providers/auth_provider.dart';
 
 class ScheduleTasksScreen extends StatefulWidget {
   const ScheduleTasksScreen({super.key});
@@ -69,90 +22,49 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
   late DateTime _selectedDate;
   late DateTime _focusedDay;
 
-  late Future<List<Event>> _eventsFuture;
+  // Future để chứa dữ liệu từ API
+  // Khởi tạo là null, sẽ được gán giá trị sau khi lấy được userId
+  Future<List<Event>>? _eventsFuture;
 
-  final String _currentUserId = "6965304ba729391015e6d079";
-  final String _baseUrl = "${dotenv.env['API_BASE_URL']}/reminder/day";
+  // Biến lưu userId động
+  late String _userId;
 
   @override
   void initState() {
     super.initState();
+
+    // Đã khởi tạo ở main.dart rồi, nên không cần gọi lại ở đây nữa
+    // NotificationService().initialize();
+
     final now = DateTime.now();
     _selectedDate = now;
     _focusedDay = now;
-    _eventsFuture = _fetchEvents(_selectedDate);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _userId = context.read<AuthProvider>().userId!;
+      _refreshData();
+    });
+  }
+}
+
+  // Hàm tiện ích để gọi lại API và setState
+  void _refreshData() {
+    setState(() {
+      _eventsFuture = ReminderService.fetchEvents(
+        userId: _userId,
+        date: _selectedDate,
+      );
+    });
   }
 
-  Future<List<Event>> _fetchEvents(DateTime date) async {
-    try {
-      final String formattedDate = DateFormat('yyyy-MM-dd').format(date);
-      final Uri url =
-          Uri.parse('$_baseUrl?user_id=$_currentUserId&date=$formattedDate');
-
-      print("🔗 Fetching URL: $url");
-
-      final response = await http.get(url);
-
-      if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
-        return data.map((json) => Event.fromJson(json)).toList();
-      } else {
-        throw Exception('Failed to load events: ${response.statusCode}');
-      }
-    } catch (e) {
-      print("Error fetching events: $e");
-      throw Exception('Error connecting to server');
-    }
-  }
-
-  // ---------------------------------------------------------
-  // HÀM XOÁ SỰ KIỆN (DELETE)
-  // ---------------------------------------------------------
-  Future<void> _deleteEvent(String eventId) async {
-    // Lấy API_BASE_URL từ env để ghép đúng đường dẫn xoá
-    // Mẫu API: DELETE http://127.0.0.1:5001/reminder/{id}
-    final String? apiBase = dotenv.env['API_BASE_URL'];
-    if (apiBase == null) return;
-
-    final Uri url = Uri.parse('$apiBase/reminder/$eventId');
-
-    try {
-      print("🗑️ Deleting URL: $url");
-      final response = await http.delete(url);
-
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        // Xoá thành công
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Đã xoá sự kiện'), backgroundColor: Colors.green),
-          );
-          // Tải lại danh sách
-          setState(() {
-            _eventsFuture = _fetchEvents(_selectedDate);
-          });
-        }
-      } else {
-        print("Failed to delete: ${response.statusCode}");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Lỗi xoá: ${response.statusCode}'),
-                backgroundColor: Colors.red),
-          );
-        }
-      }
-    } catch (e) {
-      print("Error deleting: $e");
-    }
-  }
-
+  // Hàm reset dữ liệu khi đổi ngày
   void _updateSelectedDate(DateTime newDate) {
     setState(() {
       _selectedDate = newDate;
       _focusedDay = newDate;
-      _eventsFuture = _fetchEvents(_selectedDate);
     });
+    // Gọi lại API với userId động và ngày mới
+    _refreshData();
   }
 
   List<DateTime> _getWeekDays(DateTime focusDate) {
@@ -191,6 +103,47 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
     }
   }
 
+  Future<void> _openAddTaskScreen() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const NewTaskScreen()),
+    );
+
+    // Nếu result là true, tải lại dữ liệu với userId động
+    if (result == true && mounted) {
+      _refreshData();
+    }
+  }
+
+  // --- HÀM XỬ LÝ XÓA (ĐÃ SỬA ĐỂ HỦY THÔNG BÁO ĐÚNG ID) ---
+  Future<void> _deleteEvent(
+      String eventId, String eventTitle, String startTime) async {
+    // Tham số startTime được thêm vào để tính toán ID notification
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Event'),
+        content: Text('Are you sure you want to delete "$eventTitle"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && mounted) {
+      _updateSelectedDate(picked);
+    }
+  }
+
   // -------------------------
   // HÀM MỞ MÀN HÌNH TASK (CÓ THỂ TẠO MỚI HOẶC SỬA/XOÁ)
   // -------------------------
@@ -203,11 +156,54 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
       ),
     );
 
-    // Nếu result là true (tạo/sửa/xoá thành công), tải lại danh sách
-    if (result == true && mounted) {
-      setState(() {
-        _eventsFuture = _fetchEvents(_selectedDate);
-      });
+    if (confirm == true && mounted) {
+      try {
+        // 1. Xóa trên API
+        await ReminderService.deleteReminder(
+          userId: _userId,
+          reminderId: eventId,
+        );
+
+        // 2. TÍNH TOÁN LẠI ID ĐỂ HỦY THÔNG BÁO CỤC BỘ
+        try {
+          final parts = startTime.split(':');
+          if (parts.length == 2) {
+            final hour = int.parse(parts[0]);
+            final minute = int.parse(parts[1]);
+
+            // Tái tạo lại DateTime đúng lúc tạo task (Ngày đang xem + giờ bắt đầu của task)
+            final notificationDate = DateTime(
+              _selectedDate.year,
+              _selectedDate.month,
+              _selectedDate.day,
+              hour,
+              minute,
+            );
+
+            // Tính lại ID giống lúc đặt notification
+            final notificationId =
+                notificationDate.millisecondsSinceEpoch ~/ 1000;
+
+            // Hủy thông báo
+            await NotificationService().cancelNotification(notificationId);
+          }
+        } catch (e) {
+          print("Error cancelling local notification: $e");
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Event deleted')),
+          );
+          _refreshData();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -218,7 +214,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
     final List<DateTime> weekDays = _getWeekDays(_focusedDay);
 
     return Scaffold(
-      backgroundColor: colorScheme.background,
+      backgroundColor: colorScheme.surface,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
@@ -226,7 +222,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
           "Schedule",
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
-            color: colorScheme.onBackground,
+            color: colorScheme.onSurface,
           ),
         ),
         actions: [
@@ -251,7 +247,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
                   _formatDateHeader(_selectedDate),
                   style: theme.textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
-                    color: colorScheme.onBackground,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 Container(
@@ -274,27 +270,29 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: FutureBuilder<List<Event>>(
-              future: _eventsFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return _buildErrorState(
-                      theme, colorScheme, snapshot.error.toString());
-                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return _buildEmptyState(theme, colorScheme);
-                } else {
-                  final events = snapshot.data!;
-                  return _buildTimeline(events, theme, colorScheme);
-                }
-              },
-            ),
+            child: _eventsFuture == null
+                ? const Center(child: CircularProgressIndicator())
+                : FutureBuilder<List<Event>>(
+                    future: _eventsFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return _buildErrorState(
+                            theme, colorScheme, snapshot.error.toString());
+                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return _buildEmptyState(theme, colorScheme);
+                      } else {
+                        final events = snapshot.data!;
+                        return _buildTimeline(events, theme, colorScheme);
+                      }
+                    },
+                  ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openTaskScreen(), // Gọi hàm chung không có ID
+        onPressed: _openAddTaskScreen,
         backgroundColor: colorScheme.secondary,
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text(
@@ -366,13 +364,13 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
                 border: Border.all(
                   color: isSelected
                       ? colorScheme.secondary
-                      : colorScheme.outline.withOpacity(0.2),
+                      : colorScheme.outline.withValues(alpha: 0.2),
                   width: 1.5,
                 ),
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: colorScheme.secondary.withOpacity(0.3),
+                          color: colorScheme.secondary.withValues(alpha: 0.3),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         )
@@ -386,8 +384,8 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
                     _getDayName(day.weekday),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: isSelected
-                          ? colorScheme.onSecondary.withOpacity(0.8)
-                          : colorScheme.onSurface.withOpacity(0.6),
+                          ? colorScheme.onSecondary.withValues(alpha: 0.8)
+                          : colorScheme.onSurface.withValues(alpha: 0.6),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -447,7 +445,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
                       Text(
                         event.endTime,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withOpacity(0.5),
+                          color: colorScheme.onSurface.withValues(alpha: 0.5),
                         ),
                       ),
                     ],
@@ -458,7 +456,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
                   height: 80,
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: event.colorTag.withOpacity(0.3),
+                    color: event.colorTag.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                   child: Column(
@@ -476,100 +474,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
                   ),
                 ),
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () =>
-                        _openTaskScreen(taskId: event.id), // Truyền ID để sửa
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.shadow.withOpacity(0.1),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: BoxDecoration(
-                                  color: event.colorTag,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  event.title,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _openTaskScreen(taskId: event.id);
-                                  } else if (value == 'delete') {
-                                    _showDeleteConfirmation(event.id);
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Sửa'),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Text('Xoá'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          if (event.location != null &&
-                              event.location!.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.location_on,
-                                    size: 16,
-                                    color:
-                                        colorScheme.onSurface.withOpacity(0.6),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      event.location!,
-                                      style:
-                                          theme.textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurface
-                                            .withOpacity(0.6),
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
+                  child: _buildEventCard(event, theme, colorScheme),
                 ),
               ],
             ),
@@ -579,41 +484,83 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
     );
   }
 
-  Widget _buildErrorState(
-      ThemeData theme, ColorScheme colorScheme, String error) {
-    return Center(
+  Widget _buildEventCard(
+      Event event, ThemeData theme, ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: colorScheme.error.withOpacity(0.5),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: event.colorTag,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        event.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // --- SỬA: THÊM event.startTime VÀO HÀM XÓA ---
+              GestureDetector(
+                onTap: () =>
+                    _deleteEvent(event.id, event.title, event.startTime),
+                child: Icon(
+                  Icons.delete_outline,
+                  color: colorScheme.error.withValues(alpha: 0.7),
+                  size: 20,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            'Không thể tải dữ liệu',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: colorScheme.onSurface,
+          if (event.location != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.location_on_outlined,
+                    size: 16,
+                    color: colorScheme.onSurface.withValues(alpha: 0.6)),
+                const SizedBox(width: 6),
+                Text(
+                  event.location!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            error,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.6),
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _eventsFuture = _fetchEvents(_selectedDate);
-              });
-            },
-            child: const Text('Thử lại'),
-          ),
+          ],
         ],
       ),
     );
@@ -624,59 +571,66 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.event_note,
-            size: 64,
-            color: colorScheme.onSurface.withOpacity(0.3),
-          ),
+          Icon(Icons.event_busy_rounded,
+              size: 64, color: colorScheme.outline.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
           Text(
-            'Không có sự kiện nào',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              color: colorScheme.onSurface,
+            'No events scheduled',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            'Thêm sự kiện mới để bắt đầu',
+            'Enjoy your free time!',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.6),
+              color: colorScheme.onSurface.withValues(alpha: 0.4),
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  void _showDeleteConfirmation(String eventId) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xác nhận xoá'),
-        content: const Text('Bạn có chắc muốn xoá sự kiện này?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Huỷ'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _deleteEvent(eventId);
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
+  Widget _buildErrorState(
+      ThemeData theme, ColorScheme colorScheme, String error) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.wifi_off_rounded,
+              size: 64, color: colorScheme.error.withValues(alpha: 0.5)),
+          const SizedBox(height: 16),
+          Text(
+            'Connection Error',
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: colorScheme.error,
             ),
-            child: const Text('Xoá'),
           ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Text(
+              'Could not load events. Please check your server.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: _refreshData,
+            child: const Text('Retry'),
+          )
         ],
       ),
     );
   }
 
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
+  // Helpers
+  bool _isSameDay(DateTime d1, DateTime d2) {
+    return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
   }
 
   String _getDayName(int weekday) {
@@ -686,18 +640,9 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
 
   String _formatDateHeader(DateTime date) {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final selected = DateTime(date.year, date.month, date.day);
-
-    if (selected == today) {
-      return 'Today';
-    } else if (selected == today.add(const Duration(days: 1))) {
-      return 'Tomorrow';
-    } else if (selected == today.subtract(const Duration(days: 1))) {
-      return 'Yesterday';
-    } else {
-      return DateFormat('EEEE, d MMM').format(date);
-    }
+    if (_isSameDay(date, now)) return 'Today';
+    if (_isSameDay(date, now.add(const Duration(days: 1)))) return 'Tomorrow';
+    return '${date.day} ${_getMonthName(date.month)}, ${date.year}';
   }
 
   String _formatMonthYear(DateTime date) {
@@ -721,4 +666,3 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
     ];
     return months[month - 1];
   }
-}

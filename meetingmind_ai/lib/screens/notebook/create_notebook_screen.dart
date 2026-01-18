@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:meetingmind_ai/services/create_notebook_service.dart';
+import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:provider/provider.dart';
 
 class CreateNotebookScreen extends StatefulWidget {
   const CreateNotebookScreen({super.key});
@@ -18,20 +18,22 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
   final _descriptionController = TextEditingController();
   final FocusNode _titleFocusNode = FocusNode();
 
-  // Animation controller
   late AnimationController _animationController;
   late Animation<double> _widthAnimation;
 
   bool _hasText = false;
   bool _isLoading = false;
-  final String _userId = "6965304ba729391015e6d079";
+  late String _userId;
 
   @override
   void initState() {
     super.initState();
     _titleFocusNode.requestFocus();
 
-    // Cấu hình Animation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _userId = context.read<AuthProvider>().userId!;
+    });
+
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
@@ -43,18 +45,14 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
     _titleController.addListener(() {
       final hasText = _titleController.text.trim().isNotEmpty;
       if (hasText != _hasText) {
-        setState(() {
-          _hasText = hasText;
-        });
+        setState(() => _hasText = hasText);
       }
     });
 
     _titleFocusNode.addListener(() {
-      if (_titleFocusNode.hasFocus) {
-        _animationController.forward();
-      } else {
-        _animationController.reverse();
-      }
+      _titleFocusNode.hasFocus
+          ? _animationController.forward()
+          : _animationController.reverse();
     });
   }
 
@@ -68,52 +66,38 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
   }
 
   Future<void> _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+    if (!_formKey.currentState!.validate()) return;
 
-      final String notebookName = _titleController.text.trim();
-      final String description = _descriptionController.text.trim();
+    setState(() => _isLoading = true);
 
-      try {
-        final String apiUrl = '${dotenv.env['API_BASE_URL']}/folder/add';
+    try {
+      await NotebookService.createNotebook(
+        userId: _userId,
+        name: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+      );
 
-        final response = await http.post(
-          Uri.parse(apiUrl),
-          headers: <String, String>{
-            'Content-Type': 'application/json; charset=UTF-8',
-          },
-          body: jsonEncode(<String, String>{
-            "user_id": _userId,
-            "name": notebookName,
-            "description": description,
-          }),
+      if (mounted) context.pop(true);
+    } catch (e) {
+      if (mounted) {
+        final theme = Theme.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e',
+                style: TextStyle(color: theme.colorScheme.onError)),
+            backgroundColor: theme.colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
         );
-
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          if (mounted) context.pop(true);
-        } else {
-          throw Exception('Server error: ${response.statusCode}');
-        }
-      } catch (e) {
-        if (mounted) {
-          final theme = Theme.of(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: $e',
-                  style: TextStyle(color: theme.colorScheme.onError)),
-              backgroundColor: theme.colorScheme.error,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-          );
-        }
-      } finally {
-        if (mounted) setState(() => _isLoading = false);
       }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // --- build(...) giữ nguyên UI bạn gửi ---
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

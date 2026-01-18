@@ -1,13 +1,8 @@
 from flask import Blueprint, request, jsonify
-from ..controllers.user_controller import UserController
+from ..services.user_service import UserController
 
 user_bp = Blueprint("user", __name__, url_prefix="/user")
 
-'''
-curl -X POST http://127.0.0.1:5000/user/add \
--H "Content-Type: application/json" \
--d '{"email":"phuc@example.com","name":"phuc","password":"123"}
-'''
 @user_bp.route("/add", methods=["POST"])
 def add_user():
     data = request.get_json()
@@ -26,4 +21,3 @@ def add_user():
 def get_user(user_id):
     response, status = UserController.get_user(user_id)
     return jsonify(response), status
-

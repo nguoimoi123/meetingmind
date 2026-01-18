@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/services/google_auth_service.dart';
@@ -77,18 +78,9 @@ class LoginScreen extends StatelessWidget {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      // ==============================
-                      // TODO: CHECK ACCOUNT LATER HERE
-                      // Example:
-                      //
-                      // final isValid = await authService.login(email, pass);
-                      // if (isValid) Navigator.pushReplacementNamed(context, '/app');
-                      //
-                      // ==============================
-
-                      // Hiện tại: bỏ qua kiểm tra, vào app luôn
-                      Provider.of<AuthProvider>(context, listen: false).login();
-                      context.go('/app/home');
+                      // Lần này khi bấm nút này, nó sẽ save vào SharedPreferences
+                      context.read<AuthProvider>().login();
+                      context.go('/app/home'); // Điều hướng về Dashboard
                     },
                     child: const Text('Log In'),
                   ),
@@ -108,20 +100,31 @@ class LoginScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
 
-                // Social Login
+                // Social Login (Google)
                 OutlinedButton.icon(
                   onPressed: () async {
                     final googleAuth = GoogleAuthService();
                     final idToken = await googleAuth.loginWithGoogle();
 
-                    if (idToken == null) return;
+                    if (idToken != null) {
+                      print("Got ID Token, sending to backend...");
 
-                    final success =
-                        await googleAuth.sendTokenToBackend(idToken);
+                      final userId =
+                          await googleAuth.sendTokenToBackend(idToken);
 
-                    if (success && context.mounted) {
-                      Provider.of<AuthProvider>(context, listen: false).login();
-                      context.go('/app/home');
+                      if (userId != null) {
+                        Provider.of<AuthProvider>(context, listen: false)
+                            .loginWithGoogle(
+                          user: await GoogleSignIn().signInSilently(),
+                          userIdFromBackend: userId,
+                        );
+                        context.go('/app/home'); // 🚀 Chuyển trang
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text("Đăng nhập thất bại từ backend")),
+                        );
+                      }
                     }
                   },
                   icon: Image.network(
@@ -131,6 +134,7 @@ class LoginScreen extends StatelessWidget {
                   ),
                   label: const Text('Continue with Google'),
                 ),
+
                 const SizedBox(height: 8),
 
                 OutlinedButton.icon(

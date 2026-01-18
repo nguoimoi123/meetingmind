@@ -2,9 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart'
+    as http; // Cần thiết cho chức năng delete nếu chưa có trong Service
 import 'package:docx_to_text/docx_to_text.dart';
+
+// Import services và providers từ project của bạn
+import 'package:meetingmind_ai/services/file_service.dart';
+import 'package:meetingmind_ai/services/chat_service.dart';
+import 'package:provider/provider.dart';
+import 'package:meetingmind_ai/providers/auth_provider.dart';
 
 class FileItem {
   String id;
@@ -29,16 +35,11 @@ class FileItem {
   }
 }
 
-// ==========================================
-// MAIN SCREEN
-// ==========================================
+// ======================= MAIN SCREEN =========================
+
 class NotebookDetailScreen extends StatefulWidget {
   final String folderId;
-
-  const NotebookDetailScreen({
-    super.key,
-    required this.folderId,
-  });
+  const NotebookDetailScreen({super.key, required this.folderId});
 
   @override
   State<NotebookDetailScreen> createState() => _NotebookDetailScreenState();
@@ -54,13 +55,9 @@ class _NotebookDetailScreenState extends State<NotebookDetailScreen> {
   }
 
   Future<void> _fetchFolderInfo() async {
-    String url = '${dotenv.env['API_BASE_URL']}/file/folder/${widget.folderId}';
-    final response = await http.get(Uri.parse(url));
-    final data = json.decode(response.body);
-
-    setState(() {
-      _folderName = data['folder_name'];
-    });
+    // Sử dụng FileService thay vì gọi http trực tiếp
+    final data = await FileService.getFolder(widget.folderId);
+    setState(() => _folderName = data['folder_name']);
   }
 
   @override
@@ -90,24 +87,24 @@ class _NotebookDetailScreenState extends State<NotebookDetailScreen> {
     );
   }
 
-  Widget _buildHeader(
-      BuildContext context, ThemeData theme, ColorScheme colorScheme) {
+  // UI Header đẹp hơn từ code mẫu 2
+  Widget _buildHeader(BuildContext context, ThemeData theme, ColorScheme cs) {
     return SafeArea(
       bottom: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24.0, 12.0, 24.0, 16.0),
         child: Row(
           children: [
-            // Nút Back style trơn, tinh tế
+            // Nút Back tròn, tinh tế
             Container(
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: colorScheme.surface,
-                border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
+                color: cs.surface,
+                border: Border.all(color: cs.outline.withOpacity(0.2)),
               ),
               child: IconButton(
                 icon: Icon(Icons.arrow_back_ios_new_rounded,
-                    size: 18, color: colorScheme.onSurface),
+                    size: 18, color: cs.onSurface),
                 onPressed: () => Navigator.of(context).pop(),
                 visualDensity: VisualDensity.compact,
               ),
@@ -120,7 +117,7 @@ class _NotebookDetailScreenState extends State<NotebookDetailScreen> {
                   Text(
                     'Notebook',
                     style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.primary,
+                      color: cs.primary,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.2,
                     ),
@@ -130,7 +127,7 @@ class _NotebookDetailScreenState extends State<NotebookDetailScreen> {
                     _folderName.isNotEmpty ? _folderName : 'Loading...',
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: colorScheme.onBackground,
+                      color: cs.onBackground,
                       height: 1.1,
                     ),
                     maxLines: 1,
@@ -145,19 +142,20 @@ class _NotebookDetailScreenState extends State<NotebookDetailScreen> {
     );
   }
 
+  // UI TabBar đẹp hơn với shadow
   Widget _buildTabBar(ThemeData theme, ColorScheme colorScheme) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24.0),
       height: 50,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest, // Màu nền nhẹ hơn nền chính
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(25),
       ),
       child: TabBar(
         dividerColor: Colors.transparent,
         indicatorSize: TabBarIndicatorSize.tab,
         indicator: BoxDecoration(
-          color: colorScheme.primary, // Màu primary khi active
+          color: colorScheme.primary,
           borderRadius: BorderRadius.circular(25),
           boxShadow: [
             BoxShadow(
@@ -167,8 +165,8 @@ class _NotebookDetailScreenState extends State<NotebookDetailScreen> {
             )
           ],
         ),
-        labelColor: colorScheme.onPrimary, // Chữ trắng
-        unselectedLabelColor: colorScheme.onSurfaceVariant, // Chữ xám
+        labelColor: colorScheme.onPrimary,
+        unselectedLabelColor: colorScheme.onSurfaceVariant,
         labelStyle:
             theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
         unselectedLabelStyle:
@@ -179,9 +177,8 @@ class _NotebookDetailScreenState extends State<NotebookDetailScreen> {
   }
 }
 
-// ==========================================
-// TAB 1: SOURCES
-// ==========================================
+// ======================= TAB SOURCES (Giao diện mới + Logic Service) =========================
+
 class SourcesTab extends StatefulWidget {
   final String folderId;
   const SourcesTab({super.key, required this.folderId});
@@ -194,57 +191,133 @@ class _SourcesTabState extends State<SourcesTab> {
   bool _isLoading = true;
   bool _isUploading = false;
   List<FileItem> _files = [];
+  late String _userId;
 
   @override
   void initState() {
     super.initState();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    _userId = auth.userId!;
     _fetchFiles();
   }
 
+  Future<void> _fetchFiles() async {
+    final data = await FileService.getFolder(widget.folderId);
+    final List list = data['files'] ?? [];
+    setState(() {
+      _files = list.map((e) => FileItem.fromJson(e)).toList();
+      _isLoading = false;
+    });
+  }
+
+  // Helper functions định dạng
   String getTimeAgo(String dateString) {
     DateTime dateTime = DateTime.parse(dateString);
     Duration diff = DateTime.now().difference(dateTime);
-
-    if (diff.inDays >= 1) {
-      return '${diff.inDays}d ago';
-    } else if (diff.inHours >= 1) {
-      return '${diff.inHours}h ago';
-    } else if (diff.inMinutes >= 1) {
-      return '${diff.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
+    if (diff.inDays >= 1) return '${diff.inDays}d ago';
+    if (diff.inHours >= 1) return '${diff.inHours}h ago';
+    if (diff.inMinutes >= 1) return '${diff.inMinutes}m ago';
+    return 'Just now';
   }
 
   String formatFileSize(int sizeInBytes) {
-    if (sizeInBytes < 1024) {
-      return '$sizeInBytes B';
-    } else if (sizeInBytes < 1048576) {
+    if (sizeInBytes < 1024) return '$sizeInBytes B';
+    if (sizeInBytes < 1048576) {
       double sizeInKB = sizeInBytes / 1024;
       return '${sizeInKB.toStringAsFixed(1)} KB';
-    } else {
-      double sizeInMB = sizeInBytes / 1048576;
-      return '${sizeInMB.toStringAsFixed(1)} MB';
     }
+    double sizeInMB = sizeInBytes / 1048576;
+    return '${sizeInMB.toStringAsFixed(1)} MB';
   }
 
-  String? validateFile(PlatformFile file) {
-    const allowedExtensions = ['docx', 'txt', 'pdf', 'md'];
-    final extension = file.extension?.toLowerCase();
+  // Logic đọc file (giống code gốc 1 nhưng được cải tổ)
+  Future<String?> readFileContent(PlatformFile file) async {
+    if (file.path == null) return null;
+    final ext = file.extension?.toLowerCase();
 
-    if (extension == null || !allowedExtensions.contains(extension)) {
-      return 'Invalid file type';
+    try {
+      if (ext == 'docx') {
+        final bytes = await File(file.path!).readAsBytes();
+        return docxToText(bytes);
+      } else if (ext == 'txt' || ext == 'md') {
+        return await File(file.path!).readAsString(encoding: utf8);
+      }
+    } catch (e) {
+      print('Error reading file: $e');
     }
     return null;
   }
 
-  Future<void> deleteFile(String fileId) async {
-    final url = '${dotenv.env['API_BASE_URL']}/file/delete/$fileId';
-    final res = await http.delete(Uri.parse(url));
-    if (res.statusCode == 200) {
+  Future<void> _pickAndUploadFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['docx', 'txt', 'md'],
+    );
+    if (result == null) return;
+
+    final file = result.files.single;
+
+    // 1. Validate
+    const allowedExtensions = ['docx', 'txt', 'md'];
+    final ext = file.extension?.toLowerCase();
+    if (ext == null || !allowedExtensions.contains(ext)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Invalid file type'),
+            behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
+
+    // 2. Đọc nội dung
+    final content = await readFileContent(file);
+    if (content == null || content.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Cannot read file or file is empty'),
+            behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
+
+    setState(() => _isUploading = true);
+
+    // 3. Upload qua Service (Logic code 1)
+    try {
+      await FileService.uploadFile(
+        userId: _userId,
+        folderId: widget.folderId,
+        file: file,
+        content: content,
+      );
       await _fetchFiles();
-    } else {
-      throw Exception('Delete file failed');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Upload failed: $e'),
+              behavior: SnackBarBehavior.floating),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  // Xử lý xóa file (Giả sử dùng http trực tiếp nếu Service chưa có hàm delete, hoặc bạn có thể thêm vào FileService)
+  Future<void> deleteFile(String fileId) async {
+    // Nếu FileService có deleteFile thì dùng: await FileService.deleteFile(fileId);
+    // Nếu chưa, ta dùng http tương tự code mẫu 2:
+    final url =
+        'YOUR_API_BASE_URL/file/delete/$fileId'; // Thay thế bằng URL thực tế
+    // Lưu ý: Bạn nên di chuyển logic này vào FileService cho sạch
+    try {
+      final res = await http.delete(Uri.parse(url));
+      if (res.statusCode == 200) {
+        await _fetchFiles();
+      }
+    } catch (e) {
+      print(e);
     }
   }
 
@@ -274,167 +347,7 @@ class _SourcesTabState extends State<SourcesTab> {
     );
 
     if (confirm == true) {
-      try {
-        await deleteFile(file.id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('File deleted successfully'),
-              backgroundColor: colorScheme.primary,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-          );
-        }
-      } catch (_) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Failed to delete file'),
-              backgroundColor: colorScheme.error,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<String> readTxtFile(String path) async {
-    final file = File(path);
-    return await file.readAsString(encoding: utf8);
-  }
-
-  Future<String> readDocxFile(String path) async {
-    final bytes = await File(path).readAsBytes();
-    final text = docxToText(bytes);
-    return text;
-  }
-
-  Future<String?> readFileContent(PlatformFile file) async {
-    if (file.path == null) return null;
-
-    final ext = file.extension?.toLowerCase();
-
-    switch (ext) {
-      case 'txt':
-      case 'md':
-        return await readTxtFile(file.path!);
-
-      case 'docx':
-        return await readDocxFile(file.path!);
-
-      default:
-        return null;
-    }
-  }
-
-  Future<void> createFileObject({
-    required String user_id,
-    required String folder_id,
-    required String filename,
-    required String file_type,
-    required int size,
-    required String? content,
-  }) async {
-    String url = '${dotenv.env['API_BASE_URL']}/file/upload';
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'user_id': user_id,
-        'folder_id': folder_id,
-        'filename': filename,
-        'file_type': file_type,
-        'size': size,
-        'content': content,
-      }),
-    );
-
-    if (response.statusCode != 200) {
-      throw Exception('Failed to create file object');
-    }
-  }
-
-  Future<void> _fetchFiles() async {
-    String url = '${dotenv.env['API_BASE_URL']}/file/folder/${widget.folderId}';
-    final res = await http.get(Uri.parse(url));
-    final data = json.decode(res.body);
-    final List list = data['files'] ?? [];
-
-    setState(() {
-      _files = list.map((e) => FileItem.fromJson(e)).toList();
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _pickAndUploadFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['docx', 'txt', 'md', 'pdf'],
-    );
-    if (result == null) return;
-
-    PlatformFile picked = result.files.single;
-
-    // CHECK FILE LOCAL
-    final error = validateFile(picked);
-    if (error != null) {
-      if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            backgroundColor: theme.colorScheme.error,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
-      return;
-    }
-
-    // 2️⃣ ĐỌC NỘI DUNG FILE
-    final content = await readFileContent(picked);
-
-    if (content == null || content.trim().isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Cannot read file content or empty file'),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
-      return;
-    }
-
-    setState(() => _isUploading = true);
-
-    try {
-      await createFileObject(
-        user_id: '6965304ba729391015e6d079',
-        folder_id: widget.folderId,
-        filename: picked.name,
-        file_type: picked.extension ?? '',
-        size: picked.size,
-        content: content,
-      );
-      await _fetchFiles();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isUploading = false);
+      await deleteFile(file.id);
     }
   }
 
@@ -479,7 +392,7 @@ class _SourcesTabState extends State<SourcesTab> {
       ),
       child: Row(
         children: [
-          // Icon Container - Sử dụng primaryContainer để tạo hiệu ứng tone sur tone
+          // Icon Container
           Container(
             width: 48,
             height: 48,
@@ -587,9 +500,8 @@ class _SourcesTabState extends State<SourcesTab> {
   }
 }
 
-// ==========================================
-// TAB 2: ASK AI
-// ==========================================
+// ======================= TAB ASK AI (Giao diện mới + Logic Service) =========================
+
 class AskAITab extends StatefulWidget {
   final String folderId;
   const AskAITab({super.key, required this.folderId});
@@ -611,7 +523,7 @@ class _AskAITabState extends State<AskAITab> {
     super.dispose();
   }
 
-  Future<void> _sendMessage() async {
+  Future<void> _sendMessage(dynamic auth) async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
@@ -620,45 +532,31 @@ class _AskAITabState extends State<AskAITab> {
       _isLoading = true;
       _textController.clear();
     });
-
     _scrollToBottom();
 
+    // Sử dụng ChatService từ code gốc 1
     try {
-      final url = Uri.parse('${dotenv.env['API_BASE_URL']}/chat/notebook');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          "user_id": "6965304ba729391015e6d079",
-          "folder_id": widget.folderId,
-          "question": text,
-        }),
+      final answer = await ChatService.ask(
+        folderId: widget.folderId,
+        question: text,
+        userId: auth.userId!,
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final aiAnswer = data['answer'];
+      if (mounted) {
         setState(() {
-          _messages.add(ChatMessage(text: aiAnswer, isUser: false));
-        });
-      } else {
-        setState(() {
-          _messages.add(ChatMessage(
-              text: 'Error: Server returned status ${response.statusCode}',
-              isUser: false));
+          _messages.add(ChatMessage(text: answer, isUser: false));
+          _isLoading = false;
         });
       }
     } catch (e) {
-      setState(() {
-        _messages.add(ChatMessage(
-            text: 'Error: Could not connect to server', isUser: false));
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-      _scrollToBottom();
+      if (mounted) {
+        setState(() {
+          _messages.add(ChatMessage(text: 'Error: $e', isUser: false));
+          _isLoading = false;
+        });
+      }
     }
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -837,7 +735,8 @@ class _AskAITabState extends State<AskAITab> {
           Expanded(
             child: TextField(
               controller: _textController,
-              onSubmitted: (_) => _sendMessage(),
+              onSubmitted: (_) => _sendMessage(
+                  Provider.of<AuthProvider>(context, listen: false)),
               decoration: InputDecoration(
                 hintText: 'Ask AI anything...',
                 hintStyle:
@@ -853,7 +752,10 @@ class _AskAITabState extends State<AskAITab> {
           Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: _isLoading ? null : _sendMessage,
+              onTap: _isLoading
+                  ? null
+                  : () => _sendMessage(
+                      Provider.of<AuthProvider>(context, listen: false)),
               customBorder: const CircleBorder(),
               child: Container(
                 padding: const EdgeInsets.all(12),

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "667113383704",
+    "project_id": "meeting-c241b",
+    "storage_bucket": "meeting-c241b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:667113383704:android:4d3fdd1d9b9c197508e06d",
+        "android_client_info": {
+          "package_name": "com.example.meetingmind_ai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA5jQoxLrDAQX9gcXqHlB67_pdZGLD7Qcg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

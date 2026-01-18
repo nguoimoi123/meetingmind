@@ -1,11 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
-// Giả sử bạn đã import file AppTheme ở đây hoặc nó được áp dụng qua main.dart
-// import 'app_theme.dart';
+import 'package:meetingmind_ai/services/notebook_list_service.dart';
+import 'package:provider/provider.dart';
+import 'package:meetingmind_ai/providers/auth_provider.dart';
 
 class NotebookListScreen extends StatefulWidget {
   const NotebookListScreen({super.key});
@@ -15,39 +13,31 @@ class NotebookListScreen extends StatefulWidget {
 }
 
 class _NotebookListScreenState extends State<NotebookListScreen> {
-  // =========================
-  // STATE VARIABLES
-  // =========================
+  final NotebookListService _notebookListService = NotebookListService();
+
   List<dynamic> _folders = [];
   bool _isLoading = true;
   String? _errorMessage;
 
-  final String _userId = "6965304ba729391015e6d079";
+  late String _userId;
 
   @override
   void initState() {
     super.initState();
-    _fetchFolders();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _userId = context.read<AuthProvider>().userId!;
+      _fetchFolders();
+    });
   }
 
-  // =========================
-  // API CALL
-  // =========================
   Future<void> _fetchFolders() async {
     try {
-      final response = await http.get(
-        Uri.parse('${dotenv.env['API_BASE_URL']}/folder/$_userId'),
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        setState(() {
-          _folders = data;
-          _isLoading = false;
-        });
-      } else {
-        throw Exception('Failed to load folders: ${response.statusCode}');
-      }
+      final data = await NotebookListService.fetchFolders(_userId);
+      setState(() {
+        _folders = data;
+        _isLoading = false;
+        _errorMessage = null;
+      });
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -58,29 +48,30 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
 
   String _formatDate(String dateString) {
     try {
-      final DateTime date = DateTime.parse(dateString);
+      final date = DateTime.parse(dateString);
       return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
+    } catch (_) {
       return dateString;
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context); // Lấy theme hiện tại (Light hoặc Dark)
+  Widget _buildNotebookRow(
+    BuildContext context,
+    Map<String, dynamic> folder,
+    Color color,
+  ) {
+    final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     return Scaffold(
-      // Sử dụng màu background từ theme
       backgroundColor: colorScheme.background,
       body: CustomScrollView(
         slivers: [
-          // --- HEADER ---
           SliverAppBar(
             floating: true,
             backgroundColor: Colors.transparent,
             elevation: 0,
-            toolbarHeight: 80, // Tăng nhẹ chiều cao cho thoáng
+            toolbarHeight: 80,
             flexibleSpace: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 10, 24, 10),
@@ -89,10 +80,9 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
                   children: [
                     Text(
                       'My Notebooks',
-                      // Sử dụng headlineMedium từ theme AppTheme
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: colorScheme.onBackground, // Màu chữ thích ứng
+                        color: colorScheme.onBackground,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -106,15 +96,12 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
               ),
             ),
           ),
-
-          // --- LOADING STATE ---
           if (_isLoading)
             SliverFillRemaining(
               child: Center(
-                  child: CircularProgressIndicator(color: colorScheme.primary)),
+                child: CircularProgressIndicator(color: colorScheme.primary),
+              ),
             ),
-
-          // --- ERROR STATE ---
           if (_errorMessage != null)
             SliverFillRemaining(
               child: Center(
@@ -136,8 +123,6 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
                 ),
               ),
             ),
-
-          // --- LIST NOTEBOOKS ---
           if (!_isLoading && _errorMessage == null)
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
@@ -145,7 +130,6 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final folder = _folders[index];
-                    // Truyền màu PrimaryColor của theme cho icon để đồng bộ
                     return _buildNotebookRow(
                       context,
                       folder,
@@ -158,20 +142,17 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
             ),
         ],
       ),
-
-      // --- FLOATING ACTION BUTTON ---
-      // Sử dụng FloatingActionButton.extended nhưng chỉnh style theo theme
       floatingActionButton: Padding(
-        padding: const EdgeInsets.all(16.0), // Padding để cách méo
+        padding: const EdgeInsets.all(16.0),
         child: FloatingActionButton.extended(
           onPressed: () => context.push('/create_notebook'),
-          backgroundColor: colorScheme.secondary, // AccentColor trong AppTheme
-          foregroundColor: colorScheme.onSecondary, // Màu chữ trắng
+          backgroundColor: colorScheme.secondary,
+          foregroundColor: colorScheme.onSecondary,
           elevation: 4,
           icon: const Icon(Icons.add_rounded),
           label: Text(
             'New',
-            style: theme.textTheme.labelLarge, // Font chữ bold từ AppTheme
+            style: theme.textTheme.labelLarge,
           ),
         ),
       ),
@@ -201,17 +182,13 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
           borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            // Sử dụng CardTheme color, nếu cần tùy biến thêm thì dùng surface
             decoration: BoxDecoration(
-              color:
-                  colorScheme.surface, // Màu nền card (White hoặc Dark Surface)
+              color: colorScheme.surface,
               borderRadius: BorderRadius.circular(20),
-              // Viền mỏng nhẹ theo màu chủ đạo nhưng trong suốt
               border: Border.all(
                 color: colorScheme.onSurface.withOpacity(0.1),
                 width: 1,
               ),
-              // Đổ bóng nhẹ giống CardTheme
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.shadow.withOpacity(0.05),
@@ -223,24 +200,20 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ICON
                 Container(
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1), // Màu nền icon nhạt hơn
+                    color: color.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     Icons.folder_rounded,
-                    color: color, // Màu icon theo màu primary
+                    color: color,
                     size: 32,
                   ),
                 ),
-
                 const SizedBox(width: 20),
-
-                // TEXT
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,8 +255,6 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
                     ],
                   ),
                 ),
-
-                // ARROW
                 Padding(
                   padding: const EdgeInsets.only(top: 4.0),
                   child: Icon(

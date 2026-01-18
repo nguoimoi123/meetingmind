@@ -1,20 +1,8 @@
 from flask import Blueprint, request, jsonify
-from ..controllers.chunk_controller import ChunkController
+from app.services.chunk_service import ChunkController
 
 chunk_bp = Blueprint("chunk", __name__, url_prefix="/chunks")
 
-'''
-curl -X POST http://127.0.0.1:5000/chunks \
--H "Content-Type: application/json" \
--d '{
-  "user_id": "6965304ba729391015e6d079",
-  "folder_id": "696530c8c738274d1d321ab6",
-  "file_id": "6965381de947b96faf03a7ac",
-  "chunk_index": 0,
-  "text": "This is the first chunk",
-  "embedding": [0.01, 0.23, 0.45]
-}'
-'''
 @chunk_bp.route("", methods=["POST"])
 def create_chunk():
     data = request.get_json()
@@ -29,9 +17,6 @@ def create_chunk():
                                                     data.get("embedding"))
     return jsonify(response), status
 
-'''
-curl http://127.0.0.1:5000/chunks/folder/696530c8c738274d1d321ab6
-'''
 @chunk_bp.route("/folder/<folder_id>", methods=["GET"])
 def get_chunks_by_folder(folder_id):
     response, status = ChunkController.get_chunks_by_folder(folder_id)
