@@ -1,138 +1,179 @@
-import 'dart:convert';
+import 'dart:convert'; // <--- Cần thiết để encode JSON
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http; // <--- Import thư viện http
 
 class NewTaskScreen extends StatefulWidget {
-  // Truyền user_id nếu cần, ở đây demo hardcode hoặc truyền vào constructor
-  const NewTaskScreen({super.key});
+  final String? taskId;
+
+  const NewTaskScreen({super.key, this.taskId});
 
   @override
   State<NewTaskScreen> createState() => _NewTaskScreenState();
 }
 
 class _NewTaskScreenState extends State<NewTaskScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _locationController = TextEditingController();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
 
-  // Các biến lưu trữ thời gian
-  DateTime? _startTime;
-  DateTime? _endTime;
+  DateTime? _selectedDate;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
 
-  // User ID cứng (trong app thực tế sẽ lấy từ Auth/UserProvider)
-  final String _userId = "6965304ba729391015e6d079";
+  // ID người dùng (Thường lấy từ SharedPreferences/Hive/Database sau khi login)
+  // Ở đây mình hardcode theo ví dụ của bạn để demo
+  String _currentUserId = "6965304ba729391015e6d079";
 
-  final String _baseUrl = "http://localhost:5001/reminder/add";
-
+  // Biến để kiểm tra trạng thái đang gọi API
   bool _isLoading = false;
 
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _locationController.dispose();
-    super.dispose();
+  // URL API
+  final String _apiUrl = "http://localhost:5001/reminder/add";
+
+  // -------------------------
+  // STEP 1: PICK DATE
+  // -------------------------
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
   }
 
-  // Hàm chọn cả Ngày và Giờ
-  Future<void> _selectDateTime({required bool isStart}) async {
-    final now = DateTime.now();
-    // 1. Chọn ngày
-    final DateTime? pickedDate = await showDatePicker(
+  // -------------------------
+  // STEP 2: PICK START TIME
+  // -------------------------
+  Future<void> _pickStartTime() async {
+    if (_selectedDate == null) return;
+
+    final picked = await showTimePicker(
       context: context,
-      initialDate: now,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+      initialTime: _startTime ?? TimeOfDay.now(),
     );
 
-    if (pickedDate == null) return;
+    if (picked != null) {
+      setState(() {
+        _startTime = picked;
+        _endTime = null; // reset end time khi start thay đổi
+      });
+    }
+  }
 
-    if (!mounted) return;
+  // -------------------------
+  // STEP 3: PICK END TIME
+  // -------------------------
+  Future<void> _pickEndTime() async {
+    if (_selectedDate == null || _startTime == null) return;
 
-    // 2. Chọn giờ
-    final TimeOfDay? pickedTime = await showTimePicker(
+    final picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: _startTime!,
     );
 
-    if (pickedTime == null) return;
+    if (picked != null) {
+      final startMinutes = _startTime!.hour * 60 + _startTime!.minute;
+      final endMinutes = picked.hour * 60 + picked.minute;
 
-    // 3. Gộp lại thành DateTime hoàn chỉnh
-    final finalDateTime = DateTime(
-      pickedDate.year,
-      pickedDate.month,
-      pickedDate.day,
-      pickedTime.hour,
-      pickedTime.minute,
-    );
-
-    setState(() {
-      if (isStart) {
-        _startTime = finalDateTime;
-        // Nếu chọn start mà chưa có end, hoặc end nhỏ hơn start, đặt lại end = start + 1 giờ mặc định
-        if (_endTime == null || _endTime!.isBefore(_startTime!)) {
-          _endTime = _startTime!.add(const Duration(hours: 1));
-        }
-      } else {
-        _endTime = finalDateTime;
+      if (endMinutes <= startMinutes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('End time must be after start time'),
+          ),
+        );
+        return;
       }
-    });
+
+      setState(() {
+        _endTime = picked;
+      });
+    }
   }
 
-  Future<void> _submitTask() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  // -------------------------
+  // UTIL: COMBINE DATE + TIME
+  // -------------------------
+  DateTime _combine(DateTime date, TimeOfDay time) {
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+  }
 
-    // Kiểm tra logic thời gian
-    if (_startTime == null || _endTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select start and end time')),
-      );
-      return;
-    }
+  // -------------------------
+  // FORM VALIDATION
+  // -------------------------
+  bool get _isFormValid =>
+      _titleController.text.trim().isNotEmpty &&
+      _selectedDate != null &&
+      _startTime != null &&
+      _endTime != null;
 
-    if (_endTime!.isBefore(_startTime!)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('End time cannot be before start time')),
-      );
-      return;
-    }
+  // -------------------------
+  // SUBMIT (CALL API)
+  // -------------------------
+  void _submit() async {
+    if (!_isFormValid || _isLoading) return;
 
     setState(() {
       _isLoading = true;
     });
 
-    try {
-      final Map<String, dynamic> body = {
-        "user_id": _userId,
-        "title": _titleController.text.trim(),
-        "location": _locationController.text.trim(),
-        "remind_start":
-            _startTime!.toUtc().toIso8601String(), // API thường expect UTC
-        "remind_end": _endTime!.toUtc().toIso8601String(),
-      };
+    final startDateTime = _combine(_selectedDate!, _startTime!);
+    final endDateTime = _combine(_selectedDate!, _endTime!);
 
+    // Tạo body khớp với format của curl
+    final Map<String, dynamic> payload = {
+      "user_id": _currentUserId,
+      "title": _titleController.text.trim(),
+      "location": _locationController.text.trim(),
+      "remind_start": startDateTime.toIso8601String(),
+      "remind_end": endDateTime.toIso8601String(),
+    };
+
+    try {
       final response = await http.post(
-        Uri.parse(_baseUrl),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode(body),
+        Uri.parse(_apiUrl),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: json.encode(payload),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Thành công
         if (mounted) {
-          Navigator.pop(context, true); // Quay về màn hình cũ và báo thành công
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Task created successfully!')),
+            const SnackBar(content: Text('Tạo task thành công!')),
           );
+          Navigator.pop(
+              context, true); // Quay về màn hình trước và báo thành công
         }
       } else {
-        throw Exception('Server Error: ${response.statusCode}');
+        // Lỗi từ Server
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(
+                    'Lỗi server: ${response.statusCode} - ${response.body}')),
+          );
+        }
       }
     } catch (e) {
+      // Lỗi kết nối (ví dụ không bật localhost:5001)
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Lỗi kết nối: $e')),
         );
       }
     } finally {
@@ -145,202 +186,147 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
   }
 
   @override
+  void dispose() {
+    _titleController.dispose();
+    _locationController.dispose();
+    super.dispose();
+  }
+
+  // -------------------------
+  // UI
+  // -------------------------
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final timeFormat = DateFormat('HH:mm, dd MMM');
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Task'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: _isLoading
-                ? const Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : TextButton(
-                    onPressed: _submitTask,
-                    child: Text(
-                      'Save',
-                      style: TextStyle(
-                        color: colorScheme.secondary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Tiêu đề
-              Text(
-                'What needs to be done?',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // TITLE
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                hintText: 'Enter task title',
               ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titleController,
-                decoration: InputDecoration(
-                  hintText: 'Task Title',
-                  filled: true,
-                  fillColor: colorScheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Please enter a title';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 24),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 16),
 
-              // Địa điểm
-              Text(
-                'Location (Optional)',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface.withOpacity(0.7),
+            // LOCATION
+            TextField(
+              controller: _locationController,
+              decoration: const InputDecoration(
+                labelText: 'Location (optional)',
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // DATE
+            _buildPickerTile(
+              icon: Icons.calendar_today,
+              title: _selectedDate == null
+                  ? 'Select date'
+                  : DateFormat('dd/MM/yyyy').format(_selectedDate!),
+              onTap: _pickDate,
+            ),
+
+            // START TIME
+            _buildPickerTile(
+              icon: Icons.schedule,
+              title: _startTime == null
+                  ? 'Select start time'
+                  : _startTime!.format(context),
+              enabled: _selectedDate != null,
+              onTap: _pickStartTime,
+            ),
+
+            // END TIME
+            _buildPickerTile(
+              icon: Icons.schedule_outlined,
+              title: _endTime == null
+                  ? 'Select end time'
+                  : _endTime!.format(context),
+              enabled: _startTime != null,
+              onTap: _pickEndTime,
+            ),
+
+            const SizedBox(height: 32),
+
+            // SUMMARY
+            if (_isFormValid)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_available),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '${DateFormat('dd/MM/yyyy').format(_selectedDate!)} '
+                        '• ${_startTime!.format(context)} → ${_endTime!.format(context)}',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _locationController,
-                decoration: InputDecoration(
-                  hintText: 'Where?',
-                  prefixIcon: Icon(Icons.location_on_outlined,
-                      color: colorScheme.outline),
-                  filled: true,
-                  fillColor: colorScheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                ),
-              ),
-              const SizedBox(height: 24),
+          ],
+        ),
+      ),
 
-              // Thời gian
-              Text(
-                'Time',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Start Time Card
-              _buildTimeCard(
-                title: 'Start Time',
-                time: _startTime,
-                format: timeFormat,
-                icon: Icons.play_arrow,
-                onTap: () => _selectDateTime(isStart: true),
-                colorScheme: colorScheme,
-                theme: theme,
-              ),
-              const SizedBox(height: 12),
-
-              // End Time Card
-              _buildTimeCard(
-                title: 'End Time',
-                time: _endTime,
-                format: timeFormat,
-                icon: Icons.flag,
-                onTap: () => _selectDateTime(isStart: false),
-                colorScheme: colorScheme,
-                theme: theme,
-              ),
-            ],
+      // SUBMIT BUTTON
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(24),
+        child: ElevatedButton(
+          onPressed: (_isFormValid && !_isLoading) ? _submit : null,
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14),
           ),
+          child: _isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text(
+                  'Create Task',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
         ),
       ),
     );
   }
 
-  Widget _buildTimeCard({
-    required String title,
-    required DateTime? time,
-    required DateFormat format,
+  // -------------------------
+  // REUSABLE TILE
+  // -------------------------
+  Widget _buildPickerTile({
     required IconData icon,
+    required String title,
     required VoidCallback onTap,
-    required ColorScheme colorScheme,
-    required ThemeData theme,
+    bool enabled = true,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorScheme.outline.withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: colorScheme.secondary),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onSurface.withOpacity(0.6),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    time != null ? format.format(time) : 'Select time',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: time != null
-                          ? colorScheme.onSurface
-                          : colorScheme.onSurface.withOpacity(0.4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, color: colorScheme.outline),
-          ],
-        ),
-      ),
+    return ListTile(
+      leading: Icon(icon),
+      title: Text(title),
+      enabled: enabled,
+      onTap: enabled ? onTap : null,
+      contentPadding: EdgeInsets.zero,
     );
   }
 }

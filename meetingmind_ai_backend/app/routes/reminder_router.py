@@ -58,3 +58,11 @@ def get_reminder_by_day():
         return {"error": "Invalid date format (YYYY-MM-DD)"}, 400
 
     return ReminderController.get_by_day(user_id, date)
+
+'''
+curl -X DELETE http://127.0.0.1:5001/reminder/696b77589a34c81408175b1f
+'''
+@reminder_bp.route('/<reminder_id>', methods=['DELETE'])
+def delete_reminder(reminder_id):
+    result, status_code = ReminderController.delete_reminder(reminder_id)
+    return jsonify(result), status_code

@@ -3,10 +3,11 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
-import 'newtask.dart';
+import 'newtask.dart'; // Đảm bảo import file NewTaskScreen đã có nút delete
 
 // Model dữ liệu sự kiện
 class Event {
@@ -26,34 +27,28 @@ class Event {
     required this.colorTag,
   });
 
-  // Factory constructor để parse từ JSON trả về từ API
   factory Event.fromJson(Map<String, dynamic> json) {
-    // Parse chuỗi thời gian từ API
     DateTime start = DateTime.parse(json['remind_start']).toLocal();
     DateTime end = DateTime.parse(json['remind_end']).toLocal();
-
-    // Format thời gian sang định dạng HH:mm (ví dụ: 14:30)
     final timeFormat = DateFormat('HH:mm');
 
-    // Danh sách màu sắc để random (đảm bảo đẹp mắt)
     final List<Color> availableColors = [
-      const Color(0xFF6366F1), // Indigo
-      const Color(0xFFEC4899), // Pink
-      const Color(0xFF10B981), // Emerald
-      const Color(0xFFF59E0B), // Amber
-      const Color(0xFF3B82F6), // Blue
-      const Color(0xFF8B5CF6), // Violet
-      const Color(0xFFEF4444), // Red
-      const Color(0xFF14B8A6), // Teal
+      const Color(0xFF6366F1),
+      const Color(0xFFEC4899),
+      const Color(0xFF10B981),
+      const Color(0xFFF59E0B),
+      const Color(0xFF3B82F6),
+      const Color(0xFF8B5CF6),
+      const Color(0xFFEF4444),
+      const Color(0xFF14B8A6),
     ];
 
-    // Logic chọn màu random
     final random = Random();
     final Color randomColor =
         availableColors[random.nextInt(availableColors.length)];
 
     return Event(
-      id: json['id'] ?? '',
+      id: json['id'] ?? '', // Đảm bảo lấy ID từ API
       title: json['title'] ?? 'No Title',
       startTime: timeFormat.format(start),
       endTime: timeFormat.format(end),
@@ -74,14 +69,10 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
   late DateTime _selectedDate;
   late DateTime _focusedDay;
 
-  // Future để chứa dữ liệu từ API
   late Future<List<Event>> _eventsFuture;
 
-  // ID người dùng (Cố định theo ví dụ, trong app thật lấy từ Authentication)
   final String _currentUserId = "6965304ba729391015e6d079";
-
-  // URL API mới
-  final String _baseUrl = "http://127.0.0.1:5001/reminder/day";
+  final String _baseUrl = "${dotenv.env['API_BASE_URL']}/reminder/day";
 
   @override
   void initState() {
@@ -89,17 +80,12 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
     final now = DateTime.now();
     _selectedDate = now;
     _focusedDay = now;
-    // Tải dữ liệu ban đầu
     _eventsFuture = _fetchEvents(_selectedDate);
   }
 
-  // Hàm gọi API (Đã cập nhật theo API mới)
   Future<List<Event>> _fetchEvents(DateTime date) async {
     try {
-      // Format ngày theo định dạng YYYY-MM-DD (Ví dụ: 2026-01-18)
       final String formattedDate = DateFormat('yyyy-MM-dd').format(date);
-
-      // Tạo URL với tham số user_id và date
       final Uri url =
           Uri.parse('$_baseUrl?user_id=$_currentUserId&date=$formattedDate');
 
@@ -107,31 +93,64 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
 
       final response = await http.get(url);
 
-      print("🔎 Status Code: ${response.statusCode}");
-
       if (response.statusCode == 200) {
         List<dynamic> data = json.decode(response.body);
-        print("✅ Found ${data.length} events.");
-
-        // Map dữ liệu JSON thành danh sách các đối tượng Event
         return data.map((json) => Event.fromJson(json)).toList();
       } else {
-        // Nếu server trả lỗi, throw exception để FutureBuilder bắt lỗi
         throw Exception('Failed to load events: ${response.statusCode}');
       }
     } catch (e) {
-      // In log lỗi để debug
       print("Error fetching events: $e");
       throw Exception('Error connecting to server');
     }
   }
 
-  // Hàm reset dữ liệu khi đổi ngày
+  // ---------------------------------------------------------
+  // HÀM XOÁ SỰ KIỆN (DELETE)
+  // ---------------------------------------------------------
+  Future<void> _deleteEvent(String eventId) async {
+    // Lấy API_BASE_URL từ env để ghép đúng đường dẫn xoá
+    // Mẫu API: DELETE http://127.0.0.1:5001/reminder/{id}
+    final String? apiBase = dotenv.env['API_BASE_URL'];
+    if (apiBase == null) return;
+
+    final Uri url = Uri.parse('$apiBase/reminder/$eventId');
+
+    try {
+      print("🗑️ Deleting URL: $url");
+      final response = await http.delete(url);
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        // Xoá thành công
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Đã xoá sự kiện'), backgroundColor: Colors.green),
+          );
+          // Tải lại danh sách
+          setState(() {
+            _eventsFuture = _fetchEvents(_selectedDate);
+          });
+        }
+      } else {
+        print("Failed to delete: ${response.statusCode}");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Lỗi xoá: ${response.statusCode}'),
+                backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      print("Error deleting: $e");
+    }
+  }
+
   void _updateSelectedDate(DateTime newDate) {
     setState(() {
       _selectedDate = newDate;
       _focusedDay = newDate;
-      // Gọi lại API cho ngày mới
       _eventsFuture = _fetchEvents(_selectedDate);
     });
   }
@@ -172,14 +191,19 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
     }
   }
 
-  Future<void> _openAddTaskScreen() async {
+  // -------------------------
+  // HÀM MỞ MÀN HÌNH TASK (CÓ THỂ TẠO MỚI HOẶC SỬA/XOÁ)
+  // -------------------------
+  Future<void> _openTaskScreen({String? taskId}) async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const NewTaskScreen()),
+      MaterialPageRoute(
+        // Truyền taskId vào đây. Nếu null -> Tạo mới. Nếu có -> Sửa/Xoá
+        builder: (context) => NewTaskScreen(taskId: taskId),
+      ),
     );
 
-    // Nếu result là true (nghĩa là đã tạo task thành công),
-    // ta sẽ gọi lại API để tải lại danh sách của ngày hiện tại
+    // Nếu result là true (tạo/sửa/xoá thành công), tải lại danh sách
     if (result == true && mounted) {
       setState(() {
         _eventsFuture = _fetchEvents(_selectedDate);
@@ -218,8 +242,6 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
           const SizedBox(height: 12),
           _buildWeekSelector(weekDays, theme, colorScheme),
           const SizedBox(height: 16),
-
-          // Header hiển thị ngày và số lượng sự kiện (sẽ update khi có dữ liệu)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0),
             child: Row(
@@ -250,10 +272,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // --- 4. DANH SÁCH SỰ KIỆN (DÙNG FUTURE BUILDER) ---
           Expanded(
             child: FutureBuilder<List<Event>>(
               future: _eventsFuture,
@@ -275,7 +294,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddTaskScreen,
+        onPressed: () => _openTaskScreen(), // Gọi hàm chung không có ID
         backgroundColor: colorScheme.secondary,
         icon: const Icon(Icons.add, color: Colors.white),
         label: Text(
@@ -336,7 +355,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
           final isToday = _isSameDay(day, DateTime.now());
 
           return GestureDetector(
-            onTap: () => _updateSelectedDate(day), // Cập nhật ngày và gọi API
+            onTap: () => _updateSelectedDate(day),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 300),
               margin: const EdgeInsets.symmetric(horizontal: 6),
@@ -457,100 +476,105 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
                   ),
                 ),
                 Expanded(
-                  child: _buildEventCard(event, theme, colorScheme),
+                  child: GestureDetector(
+                    onTap: () =>
+                        _openTaskScreen(taskId: event.id), // Truyền ID để sửa
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.shadow.withOpacity(0.1),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: event.colorTag,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  event.title,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _openTaskScreen(taskId: event.id);
+                                  } else if (value == 'delete') {
+                                    _showDeleteConfirmation(event.id);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Text('Sửa'),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Xoá'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          if (event.location != null &&
+                              event.location!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    size: 16,
+                                    color:
+                                        colorScheme.onSurface.withOpacity(0.6),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      event.location!,
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurface
+                                            .withOpacity(0.6),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
           );
         }),
-      ),
-    );
-  }
-
-  Widget _buildEventCard(
-      Event event, ThemeData theme, ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: event.colorTag, // Sử dụng màu random từ API
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  event.title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (event.location != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.location_on_outlined,
-                    size: 16, color: colorScheme.onSurface.withOpacity(0.6)),
-                const SizedBox(width: 6),
-                Text(
-                  event.location!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurface.withOpacity(0.8),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(ThemeData theme, ColorScheme colorScheme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.event_busy_rounded,
-              size: 64, color: colorScheme.outline.withOpacity(0.5)),
-          const SizedBox(height: 16),
-          Text(
-            'No events scheduled',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.6),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Enjoy your free time!',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.4),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -561,43 +585,98 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.wifi_off_rounded,
-              size: 64, color: colorScheme.error.withOpacity(0.5)),
+          Icon(
+            Icons.error_outline,
+            size: 64,
+            color: colorScheme.error.withOpacity(0.5),
+          ),
           const SizedBox(height: 16),
           Text(
-            'Connection Error',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: colorScheme.error,
+            'Không thể tải dữ liệu',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: colorScheme.onSurface,
             ),
           ),
           const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Text(
-              'Could not load events. Please check your server.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withOpacity(0.6),
-              ),
+          Text(
+            error,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
             ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () {
               setState(() {
                 _eventsFuture = _fetchEvents(_selectedDate);
               });
             },
-            child: const Text('Retry'),
-          )
+            child: const Text('Thử lại'),
+          ),
         ],
       ),
     );
   }
 
-  // Helpers
-  bool _isSameDay(DateTime d1, DateTime d2) {
-    return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
+  Widget _buildEmptyState(ThemeData theme, ColorScheme colorScheme) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.event_note,
+            size: 64,
+            color: colorScheme.onSurface.withOpacity(0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Không có sự kiện nào',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Thêm sự kiện mới để bắt đầu',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface.withOpacity(0.6),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(String eventId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xác nhận xoá'),
+        content: const Text('Bạn có chắc muốn xoá sự kiện này?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Huỷ'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _deleteEvent(eventId);
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: const Text('Xoá'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   String _getDayName(int weekday) {
@@ -607,9 +686,18 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
 
   String _formatDateHeader(DateTime date) {
     final now = DateTime.now();
-    if (_isSameDay(date, now)) return 'Today';
-    if (_isSameDay(date, now.add(const Duration(days: 1)))) return 'Tomorrow';
-    return '${date.day} ${_getMonthName(date.month)}, ${date.year}';
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = DateTime(date.year, date.month, date.day);
+
+    if (selected == today) {
+      return 'Today';
+    } else if (selected == today.add(const Duration(days: 1))) {
+      return 'Tomorrow';
+    } else if (selected == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday';
+    } else {
+      return DateFormat('EEEE, d MMM').format(date);
+    }
   }
 
   String _formatMonthYear(DateTime date) {

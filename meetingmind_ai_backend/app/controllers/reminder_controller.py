@@ -23,7 +23,7 @@ class ReminderController:
             user_id=user_id,
             remind_start__gte=start_of_day,
             remind_start__lte=end_of_day
-        )
+        ).order_by('remind_start')
 
         return [
             {
@@ -36,3 +36,11 @@ class ReminderController:
             }
             for r in reminders
         ], 200
+
+    @staticmethod
+    def delete_reminder(reminder_id):
+        reminder = Reminder.objects(id=reminder_id).first()
+        if not reminder:
+            return {"error": "Reminder not found"}, 404
+        reminder.delete()
+        return {"message": "Reminder deleted"}, 200
