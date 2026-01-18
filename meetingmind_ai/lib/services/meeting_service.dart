@@ -3,12 +3,13 @@ import 'dart:convert';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
 import '../models/meeting_models.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class MeetingService {
   IO.Socket get socket => _socket!;
   String? meetingSid;
 
-  static const String _serverUrl = 'http://192.168.122.243:5000';
+  static final String? _serverUrl = dotenv.env['API_BASE_URL'];
 
   IO.Socket? _socket;
   final StreamController<TranscriptMessage> _transcriptController =

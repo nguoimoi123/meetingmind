@@ -1,14 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class NotebookService {
-  static const String _baseUrl = 'http://192.168.122.243:5000';
+  static final String? _baseUrl = dotenv.env['API_BASE_URL'];
   static Future<void> createNotebook({
     required String userId,
     required String name,
     required String description,
   }) async {
-    const String apiUrl = '$_baseUrl/folder/add';
+    String apiUrl = '$_baseUrl/folder/add';
 
     final response = await http.post(
       Uri.parse(apiUrl),

@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ChatService {
-  static const String _baseUrl = 'http://192.168.122.243:5000';
+  String? _baseUrl = dotenv.get('API_BASE_URL');
+
   final String _currentUserId = "user_123"; // User giả định
 
   Future<String> askAboutMeeting(String sid, String question) async {

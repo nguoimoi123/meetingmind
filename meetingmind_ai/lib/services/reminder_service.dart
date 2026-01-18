@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/event_model.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ReminderService {
-  static const String _baseUrl =
-      "http://192.168.122.243:5000"; // đổi theo môi trường
+  static final String? _baseUrl = dotenv.env['API_BASE_URL'];
 
   static Future<void> createTask({
     required String userId,
@@ -17,8 +17,8 @@ class ReminderService {
       "user_id": userId,
       "title": title,
       "location": location,
-      "remind_start": startTime.toUtc().toIso8601String(),
-      "remind_end": endTime.toUtc().toIso8601String(),
+      "remind_start": startTime.toIso8601String(),
+      "remind_end": endTime.toIso8601String(),
     };
 
     final res = await http.post(
@@ -50,6 +50,7 @@ class ReminderService {
     }
 
     final List data = json.decode(res.body);
+    print("Fetched events: $data");
     return data.map((e) => Event.fromJson(e)).toList();
   }
 

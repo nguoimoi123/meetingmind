@@ -1,13 +1,15 @@
 import 'dart:convert';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class GoogleAuthService {
   // 🔴 PHẢI TRÙNG GOOGLE_CLIENT_ID BACKEND
   static const String _webClientId =
       "828381156455-k2cht1g24gd4mv8nva7d19r5gh4hje85.apps.googleusercontent.com";
 
-  static const String _backendUrl = "http://192.168.122.243:5000/auth/google";
+  static final String _backendUrl =
+      dotenv.env['API_BASE_URL']! + "/auth/google";
   // Android emulator → 10.0.2.2
   // iOS simulator → http://localhost:5000
 

@@ -2,6 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>This app needs to show notifications</string>
+	<key>UIUserNotificationSettings</key> <!-- Cho phép âm thanh, badge, alert -->
+	<dict>
+		<key>UIUserNotificationTypes</key>
+		<array>
+			<string>UIUserNotificationTypeAlert</string>
+			<string>UIUserNotificationTypeSound</string>
+			<string>UIUserNotificationTypeBadge</string>
+		</array>
+	</dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -45,5 +60,20 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<!-- Google Sign In -->
+	<key>GIDClientID</key>
+	<string>IOS_CLIENT_ID.apps.googleusercontent.com</string>
+
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+			<string>828381156455-k2cht1g24gd4mv8nva7d19r5gh4hje85.apps.googleusercontent.com</string>
+			</array>
+		</dict>
+	</array>
+
 </dict>
 </plist>

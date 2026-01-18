@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class FileService {
   // ignore: constant_identifier_names
-  static const String BASE_URL = 'http://192.168.122.243:5000';
+  static final String? BASE_URL = dotenv.env['API_BASE_URL'];
 
   /// Lấy folder + danh sách file
   static Future<Map<String, dynamic>> getFolder(String folderId) async {

@@ -1,7 +1,3 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -45,7 +41,6 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
       _refreshData();
     });
   }
-}
 
   // Hàm tiện ích để gọi lại API và setState
   void _refreshData() {
@@ -134,25 +129,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Delete'),
           ),
-          child: child!,
-        );
-      },
-    );
-
-    if (picked != null && mounted) {
-      _updateSelectedDate(picked);
-    }
-  }
-
-  // -------------------------
-  // HÀM MỞ MÀN HÌNH TASK (CÓ THỂ TẠO MỚI HOẶC SỬA/XOÁ)
-  // -------------------------
-  Future<void> _openTaskScreen({String? taskId}) async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        // Truyền taskId vào đây. Nếu null -> Tạo mới. Nếu có -> Sửa/Xoá
-        builder: (context) => NewTaskScreen(taskId: taskId),
+        ],
       ),
     );
 
@@ -666,3 +643,4 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
     ];
     return months[month - 1];
   }
+}

@@ -36,6 +36,7 @@ import 'screens/notebook/notebook_detail_screen.dart';
 
 import 'screens/notebook/create_notebook_screen.dart';
 import 'screens/schedule/new_task_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +50,8 @@ void main() async {
   final authProvider = AuthProvider();
   await authProvider.init();
 
+  // Load .env file
+  await dotenv.load(fileName: ".env");
   runApp(
     MultiProvider(
       providers: [

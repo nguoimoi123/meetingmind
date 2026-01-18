@@ -46,7 +46,7 @@ class AuthProvider extends ChangeNotifier {
   // --- HÀM ĐĂNG NHẬP THỦ CÔNG (Dummy) ---
   void login() async {
     // Giả lập user_id cho local login
-    _userId = "local_dummy_user_id";
+    _userId = "6965304ba729391015e6d079";
     _isLoggedIn = true;
 
     await _saveData(); // Lưu xuống bộ nhớ

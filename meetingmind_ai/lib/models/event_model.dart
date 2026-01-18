@@ -20,24 +20,13 @@ class Event {
   });
 
   factory Event.fromJson(Map<String, dynamic> json) {
-    // Parse chuỗi thời gian từ API
-    String startStr = json['remind_start'];
-    String endStr = json['remind_end'];
+    // Chuỗi backend trả về là LOCAL TIME
+    final String startStr = json['remind_start'];
+    final String endStr = json['remind_end'];
 
-    // --- SỬA: ÉP THÊM CHỮ 'Z' VÀO CUỐI CHUỖI NẾU THIẾU ---
-    // Điều này bảo Flutter rằng thời gian này là UTC
-    if (!startStr.endsWith('Z') && !startStr.contains('+')) {
-      startStr += 'Z';
-    }
-    if (!endStr.endsWith('Z') && !endStr.contains('+')) {
-      endStr += 'Z';
-    }
-    // ------------------------------------------------
+    final DateTime start = DateTime.parse(startStr);
+    final DateTime end = DateTime.parse(endStr);
 
-    DateTime start = DateTime.parse(startStr).toLocal();
-    DateTime end = DateTime.parse(endStr).toLocal();
-
-    // Format thời gian sang định dạng HH:mm
     final timeFormat = DateFormat('HH:mm');
 
     final List<Color> availableColors = [
@@ -58,8 +47,8 @@ class Event {
     return Event(
       id: json['id'] ?? '',
       title: json['title'] ?? 'No Title',
-      startTime: timeFormat.format(start),
-      endTime: timeFormat.format(end),
+      startTime: timeFormat.format(start), // 18:00 ✅
+      endTime: timeFormat.format(end), // 19:00 ✅
       location: json['location'],
       colorTag: randomColor,
     );

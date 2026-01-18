@@ -19,23 +19,26 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
   final _locationController = TextEditingController();
 
   // Các biến lưu trữ thời gian
-  DateTime? _startTime;
-  DateTime? _endTime;
+  DateTime? _selectedDate;
+  TimeOfDay? _startTime;
+  TimeOfDay? _endTime;
 
-  // User ID động (sẽ lấy từ AuthProvider trong initState)
+  // User ID động
   late String _userId;
-
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Sử dụng addPostFrameCallback để lấy userId an toàn sau khi widget được mount
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userProvider = context.read<AuthProvider>();
       if (userProvider.userId != null) {
         setState(() {
           _userId = userProvider.userId!;
+        });
+      } else {
+        setState(() {
+          _userId = 'unknown_user';
         });
       }
     });
@@ -48,49 +51,95 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
     super.dispose();
   }
 
-  // Hàm chọn cả Ngày và Giờ
-  Future<void> _selectDateTime({required bool isStart}) async {
-    final now = DateTime.now();
-    // 1. Chọn ngày
+  // --- HÀM CHỌN NGÀY ---
+  Future<void> _selectDate() async {
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: now,
+      initialDate: DateTime.now(),
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
     );
 
-    if (pickedDate == null) return;
+    if (pickedDate != null && mounted) {
+      setState(() {
+        _selectedDate = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+        );
+        _startTime = null;
+        _endTime = null;
+      });
+    }
+  }
 
-    if (!mounted) return;
+  // --- HÀM CHỌN GIỜ BẮT ĐẦU ---
+  Future<void> _selectStartTime() async {
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a date first')),
+      );
+      return;
+    }
 
-    // 2. Chọn giờ
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
     );
 
-    if (pickedTime == null) return;
+    if (pickedTime != null && mounted) {
+      setState(() {
+        _startTime = pickedTime;
+        // Tự động set End Time = Start Time + 1 giờ nếu chưa chọn
+        if (_endTime == null ||
+            _endTime!.hour < _startTime!.hour ||
+            (_endTime!.hour == _startTime!.hour &&
+                _endTime!.minute < _startTime!.minute)) {
+          _endTime = TimeOfDay(
+            hour: (_startTime!.hour + 1) % 24,
+            minute: _startTime!.minute,
+          );
+        }
+      });
+    }
+  }
 
-    // 3. Gộp lại thành DateTime hoàn chỉnh
-    final finalDateTime = DateTime(
-      pickedDate.year,
-      pickedDate.month,
-      pickedDate.day,
-      pickedTime.hour,
-      pickedTime.minute,
+  // --- HÀM CHỌN GIỜ KẾT THÚC ---
+  Future<void> _selectEndTime() async {
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a date first')),
+      );
+      return;
+    }
+    if (_startTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select start time first')),
+      );
+      return;
+    }
+
+    final TimeOfDay? pickedTime = await showTimePicker(
+      context: context,
+      initialTime: _startTime!,
     );
 
-    setState(() {
-      if (isStart) {
-        _startTime = finalDateTime;
-        // Nếu chọn start mà chưa có end, hoặc end nhỏ hơn start, đặt lại end = start + 1 giờ mặc định
-        if (_endTime == null || _endTime!.isBefore(_startTime!)) {
-          _endTime = _startTime!.add(const Duration(hours: 1));
-        }
-      } else {
-        _endTime = finalDateTime;
-      }
-    });
+    if (pickedTime != null && mounted) {
+      setState(() {
+        _endTime = pickedTime;
+      });
+    }
+  }
+
+  // --- HÀM GỘP DỮ LIỆU ĐỂ GỬI API ---
+  DateTime _combineDateTime(TimeOfDay time) {
+    return DateTime(
+      _selectedDate!.year,
+      _selectedDate!.month,
+      _selectedDate!.day,
+      time.hour,
+      time.minute,
+    );
   }
 
   Future<void> _submitTask() async {
@@ -99,16 +148,21 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
     }
 
     // Kiểm tra logic thời gian
-    if (_startTime == null || _endTime == null) {
+    if (_selectedDate == null || _startTime == null || _endTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select start and end time')),
+        const SnackBar(
+            content: Text('Please complete Date, Start and End time')),
       );
       return;
     }
 
-    if (_endTime!.isBefore(_startTime!)) {
+    // Chuyển đổi thành full DateTime để so sánh
+    final startFull = _combineDateTime(_startTime!);
+    final endFull = _combineDateTime(_endTime!);
+
+    if (endFull.isBefore(startFull) || endFull.isAtSameMomentAs(startFull)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('End time cannot be before start time')),
+        const SnackBar(content: Text('End time must be after start time')),
       );
       return;
     }
@@ -118,21 +172,18 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
     });
 
     try {
-      // 1. Gọi API lưu vào Database
+      // Gọi API Service (đã xử lý format ngày giờ bên trong)
       await ReminderService.createTask(
         userId: _userId,
         title: _titleController.text.trim(),
         location: _locationController.text.trim(),
-        startTime: _startTime!,
-        endTime: _endTime!,
+        startTime: startFull,
+        endTime: endFull,
       );
 
-      // 2. XIN QUYỀN TRƯỚC KHI ĐẶT THÔNG BÁO (Quan trọng)
+      // Xử lý Notification
       await NotificationService().requestPermissions();
-
-      // 3. Lên lịch thông báo cục bộ trên điện thoại
-      // Sử dụng timestamp của startTime để làm ID thông báo (để xóa sau này nếu cần)
-      final notificationId = _startTime!.millisecondsSinceEpoch ~/ 1000;
+      final notificationId = startFull.millisecondsSinceEpoch ~/ 1000;
 
       await NotificationService().scheduleNotification(
         id: notificationId,
@@ -140,7 +191,7 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
         body: _locationController.text.trim().isEmpty
             ? 'Event starting now!'
             : 'at ${_locationController.text.trim()}',
-        scheduledTime: _startTime!,
+        scheduledTime: startFull,
       );
 
       if (mounted) {
@@ -168,7 +219,8 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final timeFormat = DateFormat('HH:mm, dd MMM');
+    final dateFormat = DateFormat('dd MMM yyyy');
+    final timeFormat = DateFormat('HH:mm');
 
     return Scaffold(
       appBar: AppBar(
@@ -207,7 +259,7 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tiêu đề
+              // 1. TITLE
               Text(
                 'What needs to be done?',
                 style: theme.textTheme.titleLarge?.copyWith(
@@ -238,7 +290,7 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Địa điểm
+              // 2. LOCATION (ĐÃ SỬA: BỔ IGNORE POINTER ĐỂ CÓ THỂ NHẬP LIỆU)
               Text(
                 'Location (Optional)',
                 style: theme.textTheme.labelLarge?.copyWith(
@@ -265,35 +317,68 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Thời gian
+              // --- PHẦN THỜI GIAN ---
+
+              // 3. DATE (NGÀY)
               Text(
-                'Time',
+                'Date',
                 style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: colorScheme.onSurface.withOpacity(0.7),
                 ),
               ),
               const SizedBox(height: 12),
-
-              // Start Time Card
-              _buildTimeCard(
-                title: 'Start Time',
-                time: _startTime,
-                format: timeFormat,
-                icon: Icons.play_arrow,
-                onTap: () => _selectDateTime(isStart: true),
+              _buildSelectorCard(
+                title: 'Select Date',
+                value: _selectedDate != null
+                    ? dateFormat.format(_selectedDate!)
+                    : null,
+                icon: Icons.calendar_today,
+                onTap: _selectDate,
                 colorScheme: colorScheme,
                 theme: theme,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 24),
 
-              // End Time Card
-              _buildTimeCard(
-                title: 'End Time',
-                time: _endTime,
-                format: timeFormat,
+              // 4. START TIME (GIỜ BẮT ĐẦU)
+              Text(
+                'Start Time',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildSelectorCard(
+                title: 'Select Start Time',
+                value: _startTime != null
+                    ? timeFormat.format(DateTime(
+                        2023, 1, 1, _startTime!.hour, _startTime!.minute))
+                    : null,
+                icon: Icons.play_arrow,
+                onTap: _selectStartTime,
+                colorScheme: colorScheme,
+                theme: theme,
+              ),
+              const SizedBox(height: 24),
+
+              // 5. END TIME (GIỜ KẾT THÚC)
+              Text(
+                'End Time',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildSelectorCard(
+                title: 'Select End Time',
+                value: _endTime != null
+                    ? timeFormat.format(
+                        DateTime(2023, 1, 1, _endTime!.hour, _endTime!.minute))
+                    : null,
                 icon: Icons.flag,
-                onTap: () => _selectDateTime(isStart: false),
+                onTap: _selectEndTime,
                 colorScheme: colorScheme,
                 theme: theme,
               ),
@@ -304,10 +389,10 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
     );
   }
 
-  Widget _buildTimeCard({
+  // Widget helper để hiển thị thẻ chọn thời gian
+  Widget _buildSelectorCard({
     required String title,
-    required DateTime? time,
-    required DateFormat format,
+    required String? value,
     required IconData icon,
     required VoidCallback onTap,
     required ColorScheme colorScheme,
@@ -346,10 +431,10 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    time != null ? format.format(time) : 'Select time',
+                    value ?? 'Not set',
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: time != null
+                      color: value != null
                           ? colorScheme.onSurface
                           : colorScheme.onSurface.withOpacity(0.4),
                     ),

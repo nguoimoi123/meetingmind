@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meetingmind_ai/services/notebook_list_service.dart';
@@ -55,11 +54,8 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
     }
   }
 
-  Widget _buildNotebookRow(
-    BuildContext context,
-    Map<String, dynamic> folder,
-    Color color,
-  ) {
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
