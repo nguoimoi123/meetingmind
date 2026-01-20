@@ -25,7 +25,8 @@ import 'screens/auth/reset_confirmation_screen.dart';
 
 import 'screens/app_shell.dart';
 
-import 'screens/meeting/dashboard_screen.dart';
+import 'home/dashboard_screen.dart';
+import 'screens/meeting/meeting_screen.dart';
 import 'screens/notebook/notebook_list_screen.dart';
 import 'screens/profile/profile_screen.dart';
 import 'screens/schedule/schedule_tasks_screen.dart';
@@ -132,6 +133,10 @@ class MyApp extends StatelessWidget {
             GoRoute(
               path: '/app/home',
               builder: (_, __) => DashboardScreen(),
+            ),
+            GoRoute(
+              path: '/app/meeting',
+              builder: (_, __) => const MeetingScreen(),
             ),
             GoRoute(
               path: '/app/notebooks',

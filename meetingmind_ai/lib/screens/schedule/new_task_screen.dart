@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/services/reminder_service.dart';
 import 'package:meetingmind_ai/services/notification_service.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:meetingmind_ai/models/event_model.dart'; // <--- THÊM IMPORT NÀY
 
 class NewTaskScreen extends StatefulWidget {
   const NewTaskScreen({super.key});
@@ -186,6 +187,7 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
       final notificationId = startFull.millisecondsSinceEpoch ~/ 1000;
 
       await NotificationService().scheduleNotification(
+        context: context, // <--- Truyền context vào đây
         id: notificationId,
         title: _titleController.text.trim(),
         body: _locationController.text.trim().isEmpty
