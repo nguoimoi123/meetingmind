@@ -24,6 +24,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool _isLoading = true;
 
+  // =================================================================
+  // PALETTE MÀU SẮC SỐNG ĐỘNG (Vibrant Palette)
+  // Được thiết kế để gán màu cho từng Notebook, tạo cảm giác đa dạng
+  // =================================================================
+  static const List<Color> _notebookColors = [
+    Color(0xFF4285F4), // Google Blue
+    Color(0xFF34A853), // Google Green
+    Color(0xFFFBBC05), // Google Yellow
+    Color(0xFFEA4335), // Google Red
+    Color(0xFFAA00FF), // Deep Purple
+    Color(0xFF00BCD4), // Cyan
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -75,12 +88,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : (hour < 18 ? 'Good Afternoon' : 'Good Evening');
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: colorScheme.surface, // Nền trắng/tối tùy theme
       body: CustomScrollView(
         slivers: [
+          // --- HEADER ---
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -92,6 +106,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: colorScheme.onSurface,
+                          letterSpacing: -0.5,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -103,29 +118,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ],
                   ),
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: colorScheme.primaryContainer,
-                    backgroundImage:
-                        const NetworkImage('https://i.pravatar.cc/150'),
+                  // Avatar với viền rực rỡ
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF2962FF), // Màu nổi bật
+                        width: 2,
+                      ),
+                    ),
+                    child: CircleAvatar(
+                      radius: 26,
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                      backgroundImage:
+                          const NetworkImage('https://i.pravatar.cc/150'),
+                    ),
                   ),
                 ],
               ),
             ),
           ),
+
+          // --- UPCOMING MEETINGS (Horizontal List) ---
           SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
                   child: Text(
                     'Upcoming Meetings',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                 ),
                 SizedBox(
-                  height: 160,
+                  height: 180, // Tăng chiều cao cho thẻ đẹp hơn
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : _upcomingMeetings.isEmpty
@@ -147,24 +178,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
             ),
           ),
+
+          // --- TODAY'S SCHEDULE WIDGET (Highlight) ---
           SliverToBoxAdapter(
             child: Container(
-              margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              margin: const EdgeInsets.fromLTRB(24, 16, 24, 16),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: colorScheme.primaryContainer.withOpacity(0.3),
+                // Gradient nhẹ tạo chiều sâu
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF2962FF).withOpacity(0.05),
+                    const Color(0xFF2962FF).withOpacity(0.0),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: const Color(0xFF2962FF).withOpacity(0.1),
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary,
+                      color: const Color(0xFF2962FF), // Màu nổi bật
                       borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2962FF).withOpacity(0.3),
+                          blurRadius: 8,
+                        )
+                      ],
                     ),
-                    child: Icon(Icons.calendar_today,
-                        color: colorScheme.onPrimary),
+                    child: const Icon(Icons.calendar_today,
+                        color: Colors.white, size: 24),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -173,7 +232,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         Text(
                           "Today's Schedule",
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          style: theme.textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
                               color: colorScheme.onSurface),
                         ),
@@ -186,23 +245,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => context.push('/app/calendar'),
-                    icon: Icon(Icons.arrow_forward, color: colorScheme.primary),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: () => context.push('/app/calendar'),
+                      icon: Icon(Icons.arrow_forward,
+                          color: colorScheme.onSurface),
+                    ),
                   ),
                 ],
               ),
             ),
           ),
+
+          // --- MY NOTEBOOKS (Grid) ---
           SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(24, 0, 24, 16),
-                  child: Text(
-                    'My Notebooks',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'My Notebooks',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w800),
+                      ),
+                      TextButton(
+                        onPressed: () {},
+                        child: Text(
+                          "View All",
+                          style: TextStyle(
+                            color: const Color(0xFF2962FF),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    ],
                   ),
                 ),
                 Padding(
@@ -215,12 +299,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       crossAxisCount: 2,
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 16,
-                      childAspectRatio: 1.1,
+                      childAspectRatio: 1.1, // Tỷ lệ khung hình vuông hơi dọc
                     ),
                     itemCount: _notebooks.length > 4 ? 4 : _notebooks.length,
                     itemBuilder: (context, index) {
                       final folder = _notebooks[index];
-                      return _buildNotebookCard(folder, colorScheme, theme);
+                      return _buildNotebookCard(
+                          folder, colorScheme, theme, index);
                     },
                   ),
                 ),
@@ -236,18 +321,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildMeetingCard(Meeting meeting, ColorScheme colorScheme,
       ThemeData theme, DateFormat dateFormat) {
     return Container(
-      width: 200,
+      width: 220, // Tăng chiều rộng một chút
       margin: const EdgeInsets.only(right: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24), // Bo tròn nhiều hơn
         border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -257,32 +342,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // Icon Video nổi bật
               Container(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: colorScheme.tertiaryContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  color: const Color(0xFF2962FF).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.videocam,
-                    color: colorScheme.onTertiary, size: 16),
+                child: const Icon(Icons.videocam,
+                    color: Color(0xFF2962FF), size: 18),
               ),
+              // Chip thời gian
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: colorScheme.secondaryContainer,
+                  color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   meeting.time,
                   style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: colorScheme.onSecondaryContainer),
+                      color: colorScheme.onSurface,
+                      letterSpacing: 0.5),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             meeting.title,
             maxLines: 2,
@@ -290,31 +379,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
               color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            dateFormat.format(meeting.date),
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurface.withOpacity(0.6),
+              height: 1.2,
             ),
           ),
           const Spacer(),
+          // Ngày tháng
+          Row(
+            children: [
+              Icon(Icons.event_outlined,
+                  size: 14, color: colorScheme.onSurface.withOpacity(0.5)),
+              const SizedBox(width: 4),
+              Text(
+                dateFormat.format(meeting.date),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurface.withOpacity(0.6),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Avatar người tham gia (Style giống NotebookLM Sources)
           Row(
             children: List.generate(
                 meeting.participants.length > 3
                     ? 3
                     : meeting.participants.length, (index) {
               return Transform.translate(
-                offset: Offset(-8.0 * index, 0),
+                offset: Offset(-12.0 * index, 0),
                 child: CircleAvatar(
-                  radius: 12,
-                  backgroundColor: colorScheme.primaryContainer,
-                  child: Text(
-                    meeting.participants[index][0].toUpperCase(),
-                    style: TextStyle(
-                        fontSize: 10, color: colorScheme.onPrimaryContainer),
-                  ),
+                  radius: 14,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                  backgroundImage: NetworkImage(
+                      'https://i.pravatar.cc/150?u=${meeting.participants[index]}'), // Giả định avatar
+                  child: meeting.participants[index].isEmpty ? null : null,
                 ),
               );
             }),
@@ -325,22 +423,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildNotebookCard(
-      dynamic folder, ColorScheme colorScheme, ThemeData theme) {
+      dynamic folder, ColorScheme colorScheme, ThemeData theme, int index) {
+    // Lấy màu từ palette theo index
+    final folderColor = _notebookColors[index % _notebookColors.length];
+
     return InkWell(
       onTap: () => context.push('/notebook_detail/${folder['id']}'),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: colorScheme.outline.withOpacity(0.08),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.folder_rounded, size: 32, color: colorScheme.primary),
-            const SizedBox(height: 12),
+            // Icon Folder với màu sắc đa dạng theo index
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: folderColor.withOpacity(0.1), // Màu nền nhạt của icon
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child:
+                  Icon(Icons.description_rounded, size: 28, color: folderColor),
+            ),
+            const SizedBox(height: 16),
             Text(
               folder['name'] ?? 'Untitled',
               maxLines: 1,
@@ -350,13 +469,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: colorScheme.onSurface,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               folder['description'] ?? 'No description',
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurface.withOpacity(0.6),
+                height: 1.3,
               ),
             ),
           ],

@@ -25,7 +25,7 @@ class GeneratingSummaryScreen extends StatelessWidget {
               'Generating summary...',
               style: TextStyle(
                 fontSize: 16,
-                color: AppTheme.secondaryColor,
+                color: AppTheme.accentColor,
                 fontWeight: FontWeight.normal,
               ),
             ),
@@ -52,8 +52,8 @@ class GeneratingSummaryScreen extends StatelessWidget {
       width: isActive ? 24.0 : 8.0,
       decoration: BoxDecoration(
         color: isActive
-            ? AppTheme.secondaryColor
-            : AppTheme.secondaryColor.withOpacity(0.3),
+            ? AppTheme.accentColor
+            : AppTheme.accentColor.withOpacity(0.3),
         borderRadius: BorderRadius.circular(12),
       ),
     );

@@ -27,7 +27,7 @@ class AnalyzingAudioScreen extends StatelessWidget {
               'Analyzing audio...',
               style: TextStyle(
                 fontSize: 16,
-                color: AppTheme.secondaryColor,
+                color: AppTheme.accentColor,
                 fontWeight: FontWeight.normal,
               ),
             ),

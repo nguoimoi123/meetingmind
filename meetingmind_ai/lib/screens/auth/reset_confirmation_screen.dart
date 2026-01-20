@@ -25,13 +25,13 @@ class ResetConfirmationScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16.0),
               decoration: BoxDecoration(
-                color: AppTheme.brightBluer.withOpacity(0.1), // Màu nền nhạt
+                color: AppTheme.successColor.withOpacity(0.1), // Màu nền nhạt
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.mark_email_read,
                 size: 64,
-                color: AppTheme.brightBluer, // Màu icon chính
+                color: AppTheme.successColor, // Màu icon chính
               ),
             ),
             const SizedBox(height: 24),

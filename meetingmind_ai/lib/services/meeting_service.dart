@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import '../models/meeting_models.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
