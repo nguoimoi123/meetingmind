@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class NotebookService {
-  static const String _baseUrl = 'http://192.168.122.243:5000';
+  static const String _baseUrl = 'http://192.168.230.243:5000';
   static Future<void> createNotebook({
     required String userId,
     required String name,

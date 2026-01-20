@@ -3,12 +3,13 @@ import 'dart:convert';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
 import '../models/meeting_models.dart';
+import 'package:intl/intl.dart';
 
 class MeetingService {
   IO.Socket get socket => _socket!;
   String? meetingSid;
 
-  static const String _serverUrl = 'http://192.168.122.243:5000';
+  static const String _serverUrl = 'http://192.168.230.243:5000';
 
   IO.Socket? _socket;
   final StreamController<TranscriptMessage> _transcriptController =
@@ -18,8 +19,9 @@ class MeetingService {
 
   bool _isRecording = false;
 
-  // User ID giả lập, thực tế lấy từ AuthService
-  final String _currentUserId = "user_123";
+  final String userId;
+
+  MeetingService(this.userId);
 
   Stream<TranscriptMessage> get transcriptStream =>
       _transcriptController.stream;
@@ -35,7 +37,7 @@ class MeetingService {
     _socket = IO.io(_serverUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
-      'query': {'user_id': _currentUserId},
+      'query': {'user_id': userId},
     });
 
     _socket!.connect();
@@ -92,7 +94,7 @@ class MeetingService {
 
   // API LẤY DANH SÁCH CỰA HỌP (Thay vì Mock)
   Future<List<Meeting>> getPastMeetings() async {
-    final uri = Uri.parse('$_serverUrl/meetings?user_id=$_currentUserId');
+    final uri = Uri.parse('$_serverUrl/meetings?user_id=$userId');
 
     try {
       final response = await http.get(uri).timeout(const Duration(seconds: 10));
@@ -100,15 +102,19 @@ class MeetingService {
       if (response.statusCode == 200) {
         List<dynamic> data = json.decode(response.body);
         return data.map((json) {
-          // Format lại ngày tháng cho đẹp
-          String dateStr = json['created_at'] ?? '';
+          final createdAt = DateTime.parse(json['created_at']);
+
           return Meeting(
             id: json['id'],
             title: json['title'],
             subtitle:
                 json['status'] == 'completed' ? 'Completed' : 'In Progress',
-            date: _formatDate(dateStr),
+            date: createdAt, // 👈 DateTime
+            time: DateFormat('HH:mm').format(createdAt), // 👈 giờ
             status: json['status'],
+            participants: List<String>.from(
+              json['participants'] ?? ['A', 'B', 'C'], // 👈 mock nếu chưa có
+            ),
           );
         }).toList();
       } else {

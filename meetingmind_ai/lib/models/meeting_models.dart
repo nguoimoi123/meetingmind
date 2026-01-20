@@ -2,8 +2,10 @@ class Meeting {
   final String id;
   final String title;
   final String subtitle;
-  final String date;
+  final DateTime date;
+  final String time;
   final String status; // 'Completed', 'In Progress'
+  final List<String> participants;
 
   Meeting({
     required this.id,
@@ -11,6 +13,8 @@ class Meeting {
     required this.subtitle,
     required this.date,
     required this.status,
+    required this.time,
+    required this.participants,
   });
 }
 

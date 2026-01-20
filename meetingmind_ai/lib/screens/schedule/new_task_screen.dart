@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/services/reminder_service.dart';
 import 'package:meetingmind_ai/services/notification_service.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:meetingmind_ai/models/event_model.dart'; // <--- THÊM IMPORT NÀY
 
 class NewTaskScreen extends StatefulWidget {
   const NewTaskScreen({super.key});
@@ -22,7 +23,7 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
   DateTime? _startTime;
   DateTime? _endTime;
 
-  // User ID động (sẽ lấy từ AuthProvider trong initState)
+  // User ID động
   late String _userId;
 
   bool _isLoading = false;
@@ -30,7 +31,6 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
   @override
   void initState() {
     super.initState();
-    // Sử dụng addPostFrameCallback để lấy userId an toàn sau khi widget được mount
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userProvider = context.read<AuthProvider>();
       if (userProvider.userId != null) {
@@ -48,10 +48,45 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
     super.dispose();
   }
 
-  // Hàm chọn cả Ngày và Giờ
+  // --- HÀM CHECK TRÙNG GIỜ ---
+  bool _isOverlapping(
+    DateTime newStart,
+    DateTime newEnd,
+    String oldStartStr,
+    String oldEndStr,
+  ) {
+    final partsStart = oldStartStr.split(':');
+    final partsEnd = oldEndStr.split(':');
+
+    if (partsStart.length != 2 || partsEnd.length != 2) return false;
+
+    final oldStartHour = int.parse(partsStart[0]);
+    final oldStartMinute = int.parse(partsStart[1]);
+    final oldEndHour = int.parse(partsEnd[0]);
+    final oldEndMinute = int.parse(partsEnd[1]);
+
+    // Tái tạo DateTime cũ cùng ngày với ngày mới đang chọn
+    final oldStart = DateTime(
+      newStart.year,
+      newStart.month,
+      newStart.day,
+      oldStartHour,
+      oldStartMinute,
+    );
+    final oldEnd = DateTime(
+      newStart.year,
+      newStart.month,
+      newStart.day,
+      oldEndHour,
+      oldEndMinute,
+    );
+
+    // Công thức check giao thoa: (NewStart < OldEnd) && (NewEnd > OldStart)
+    return newStart.isBefore(oldEnd) && newEnd.isAfter(oldStart);
+  }
+
   Future<void> _selectDateTime({required bool isStart}) async {
     final now = DateTime.now();
-    // 1. Chọn ngày
     final DateTime? pickedDate = await showDatePicker(
       context: context,
       initialDate: now,
@@ -60,10 +95,8 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
     );
 
     if (pickedDate == null) return;
-
     if (!mounted) return;
 
-    // 2. Chọn giờ
     final TimeOfDay? pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -71,7 +104,6 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
 
     if (pickedTime == null) return;
 
-    // 3. Gộp lại thành DateTime hoàn chỉnh
     final finalDateTime = DateTime(
       pickedDate.year,
       pickedDate.month,
@@ -83,7 +115,6 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
     setState(() {
       if (isStart) {
         _startTime = finalDateTime;
-        // Nếu chọn start mà chưa có end, hoặc end nhỏ hơn start, đặt lại end = start + 1 giờ mặc định
         if (_endTime == null || _endTime!.isBefore(_startTime!)) {
           _endTime = _startTime!.add(const Duration(hours: 1));
         }
@@ -98,7 +129,6 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
       return;
     }
 
-    // Kiểm tra logic thời gian
     if (_startTime == null || _endTime == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select start and end time')),
@@ -118,7 +148,78 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
     });
 
     try {
-      // 1. Gọi API lưu vào Database
+      // 1. LẤY DANH SÁCH LỊCH TRONG NGÀY ĐỂ CHECK TRÙNG
+      // Chỉ check nếu có ngày giờ chọn
+      if (_startTime != null) {
+        final existingEvents = await ReminderService.fetchEvents(
+          userId: _userId,
+          date: _startTime!,
+        );
+
+        Event? conflictingEvent;
+
+        for (var event in existingEvents) {
+          if (_isOverlapping(
+              _startTime!, _endTime!, event.startTime, event.endTime)) {
+            conflictingEvent = event;
+            break; // Chỉ cần tìm 1 cái bị trùng
+          }
+        }
+
+        // Nếu có trùng -> Hiện Dialog
+        if (conflictingEvent != null) {
+          final shouldProceed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Trùng lịch trình'),
+              content: Text(
+                  'Đã có sự kiện "${conflictingEvent?.title}" vào khung giờ này.\nBạn có muốn thay thế sự kiện đó không?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Hủy'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  child: const Text('Thay thế'),
+                ),
+              ],
+            ),
+          );
+
+          // Nếu người dùng bấm Hủy -> Dừng lại
+          if (shouldProceed != true) {
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+              });
+            }
+            return;
+          }
+
+          // Nếu đồng ý thay thế -> Xóa sự kiện cũ (Cả Database và Notification)
+          print("Deleting conflicting event: ${conflictingEvent.id}");
+          await ReminderService.deleteReminder(
+            userId: _userId,
+            reminderId: conflictingEvent.id,
+          );
+
+          // Cần hủy thông báo của sự kiện cũ
+          final parts = conflictingEvent.startTime.split(':');
+          if (parts.length == 2) {
+            final h = int.parse(parts[0]);
+            final m = int.parse(parts[1]);
+            final oldDateTime = DateTime(
+                _startTime!.year, _startTime!.month, _startTime!.day, h, m);
+            final oldNotificationId =
+                oldDateTime.millisecondsSinceEpoch ~/ 1000;
+            await NotificationService().cancelNotification(oldNotificationId);
+          }
+        }
+      }
+
+      // 2. TẠO SỰ KIỆN MỚI
       await ReminderService.createTask(
         userId: _userId,
         title: _titleController.text.trim(),
@@ -127,14 +228,12 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
         endTime: _endTime!,
       );
 
-      // 2. XIN QUYỀN TRƯỚC KHI ĐẶT THÔNG BÁO (Quan trọng)
+      // 3. ĐẶT THÔNG BÁO MỚI
       await NotificationService().requestPermissions();
-
-      // 3. Lên lịch thông báo cục bộ trên điện thoại
-      // Sử dụng timestamp của startTime để làm ID thông báo (để xóa sau này nếu cần)
       final notificationId = _startTime!.millisecondsSinceEpoch ~/ 1000;
 
       await NotificationService().scheduleNotification(
+        context: context, // <--- Truyền context vào đây
         id: notificationId,
         title: _titleController.text.trim(),
         body: _locationController.text.trim().isEmpty
@@ -207,7 +306,6 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tiêu đề
               Text(
                 'What needs to be done?',
                 style: theme.textTheme.titleLarge?.copyWith(
@@ -237,8 +335,6 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
                 },
               ),
               const SizedBox(height: 24),
-
-              // Địa điểm
               Text(
                 'Location (Optional)',
                 style: theme.textTheme.labelLarge?.copyWith(
@@ -264,8 +360,6 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Thời gian
               Text(
                 'Time',
                 style: theme.textTheme.labelLarge?.copyWith(
@@ -274,8 +368,6 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-
-              // Start Time Card
               _buildTimeCard(
                 title: 'Start Time',
                 time: _startTime,
@@ -286,8 +378,6 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
                 theme: theme,
               ),
               const SizedBox(height: 12),
-
-              // End Time Card
               _buildTimeCard(
                 title: 'End Time',
                 time: _endTime,

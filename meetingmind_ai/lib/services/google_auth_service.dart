@@ -7,7 +7,7 @@ class GoogleAuthService {
   static const String _webClientId =
       "828381156455-k2cht1g24gd4mv8nva7d19r5gh4hje85.apps.googleusercontent.com";
 
-  static const String _backendUrl = "http://192.168.122.243:5000/auth/google";
+  static const String _backendUrl = "http://192.168.230.243:5000/auth/google";
   // Android emulator → 10.0.2.2
   // iOS simulator → http://localhost:5000
 

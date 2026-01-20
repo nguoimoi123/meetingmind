@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meetingmind_ai/services/meeting_service.dart';
@@ -14,7 +16,8 @@ class InMeetingScreen extends StatefulWidget {
 }
 
 class _InMeetingScreenState extends State<InMeetingScreen> {
-  final MeetingService _meetingService = MeetingService();
+  late MeetingService _meetingService;
+
   final AudioRecorder _audioRecorder = AudioRecorder();
   final List<TranscriptMessage> _messages = [];
   final Map<String, String> _speakerNames =
@@ -31,8 +34,15 @@ class _InMeetingScreenState extends State<InMeetingScreen> {
   String? _pendingSpeakerId;
 
   @override
-  void initState() {
-    super.initState();
+  // void initState() {
+  //   super.initState();
+  //   _connectAndStart();
+  // }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final userId = context.read<AuthProvider>().userId!;
+    _meetingService = MeetingService(userId);
     _connectAndStart();
   }
 

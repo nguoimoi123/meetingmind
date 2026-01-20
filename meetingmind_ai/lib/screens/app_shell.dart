@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import 'meeting/dashboard_screen.dart';
+import '../home/dashboard_screen.dart';
 import 'notebook/notebook_list_screen.dart';
 import 'schedule/schedule_tasks_screen.dart';
 import 'profile/profile_screen.dart';
@@ -16,6 +16,11 @@ class AppShell extends StatelessWidget {
       icon: Icon(Icons.home_outlined),
       selectedIcon: Icon(Icons.home),
       label: 'Home',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.videocam_outlined),
+      selectedIcon: Icon(Icons.videocam),
+      label: 'Meeting',
     ),
     NavigationDestination(
       icon: Icon(Icons.book_outlined),
@@ -36,9 +41,10 @@ class AppShell extends StatelessWidget {
 
   int _getSelectedIndex(String location) {
     if (location.startsWith('/app/home')) return 0;
-    if (location.startsWith('/app/notebooks')) return 1;
-    if (location.startsWith('/app/calendar')) return 2;
-    if (location.startsWith('/app/profile')) return 3;
+    if (location.startsWith('/app/meeting')) return 1;
+    if (location.startsWith('/app/notebooks')) return 2;
+    if (location.startsWith('/app/calendar')) return 3;
+    if (location.startsWith('/app/profile')) return 4;
     return 0;
   }
 
@@ -59,12 +65,15 @@ class AppShell extends StatelessWidget {
               router.go('/app/home');
               break;
             case 1:
-              router.go('/app/notebooks');
+              router.go('/app/meeting');
               break;
             case 2:
-              router.go('/app/calendar');
+              router.go('/app/notebooks');
               break;
             case 3:
+              router.go('/app/calendar');
+              break;
+            case 4:
               router.go('/app/profile');
               break;
           }
