@@ -244,9 +244,11 @@ class _MeetingScreenState extends State<MeetingScreen> {
           elevation: 4,
           backgroundColor: _vibrantBlue,
           icon: const Icon(Icons.add, color: Colors.white),
-          label: const Text('New Meeting',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+          label: const Text('New',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
         ),
       ),
     );

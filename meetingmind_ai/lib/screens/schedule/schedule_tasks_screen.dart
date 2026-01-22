@@ -290,7 +290,7 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
           icon: const Icon(Icons.add, color: Colors.white),
           label: Text(
-            'New Task',
+            'New',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
         ),

@@ -55,6 +55,60 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
     }
   }
 
+  Future<bool> _showDeleteConfirm(BuildContext context, String name) async {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text('Delete notebook', style: theme.textTheme.titleLarge),
+        content: Text(
+            'Are you sure you want to delete "$name"? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child:
+                Text('Cancel', style: TextStyle(color: colorScheme.onSurface)),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    return confirm ?? false;
+  }
+
+  Future<void> _deleteFolder(String folderId) async {
+    try {
+      await NotebookListService.deleteFolder(folderId);
+      // Refresh list after delete
+      await _fetchFolders();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Notebook deleted successfully'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete notebook: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   String _formatDate(String dateString) {
     try {
       final date = DateTime.parse(dateString);
@@ -195,7 +249,7 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
           elevation: 4,
           backgroundColor: Color(0xFF2962FF),
           icon: const Icon(Icons.add, color: Colors.white),
-          label: const Text('New Notebook',
+          label: const Text('New',
               style:
                   TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           shape:
@@ -217,112 +271,135 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
     final String description = folder['description'] ?? 'No description added.';
     final String createdAt = folder['created_at'] ?? '';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: colorScheme.surfaceContainerLow, // Màu nền xám rất nhạt
-        borderRadius: BorderRadius.circular(16),
-        elevation: 0,
-        child: InkWell(
-          onTap: () {
-            context.push('/notebook_detail/${folder['id']}');
-          },
+    return Dismissible(
+      key: Key(folder['id']),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: colorScheme.error,
           borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: colorScheme.outline.withOpacity(0.1), // Viền rất mờ
-                width: 1,
+        ),
+        child: const Icon(
+          Icons.delete,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        return await _showDeleteConfirm(context, name);
+      },
+      onDismissed: (direction) {
+        _deleteFolder(folder['id']);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Material(
+          color: colorScheme.surfaceContainerLow, // Màu nền xám rất nhạt
+          borderRadius: BorderRadius.circular(16),
+          elevation: 0,
+          child: InkWell(
+            onTap: () {
+              context.push('/notebook_detail/${folder['id']}');
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.outline.withOpacity(0.1), // Viền rất mờ
+                  width: 1,
+                ),
               ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Icon Notebook với màu sắc động
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color:
-                        accentColor.withOpacity(0.1), // Nhấn màu nền icon nhẹ
-                    borderRadius: BorderRadius.circular(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Icon Notebook với màu sắc động
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color:
+                          accentColor.withOpacity(0.1), // Nhấn màu nền icon nhẹ
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.description_outlined, // Icon tài liệu
+                      color: accentColor,
+                      size: 24,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.description_outlined, // Icon tài liệu
-                    color: accentColor,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
+                  const SizedBox(width: 16),
 
-                // Nội dung chính
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Tiêu đề
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.onSurface,
-                          fontSize: 17,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-
-                      // Mô tả
-                      Text(
-                        description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          height: 1.4,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Footer: Ngày tạo và dấu chấm trỏ
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.schedule_outlined,
-                            size: 13,
-                            color:
-                                colorScheme.onSurfaceVariant.withOpacity(0.7),
+                  // Nội dung chính
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Tiêu đề
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurface,
+                            fontSize: 17,
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Created ${_formatDate(createdAt)}',
-                            style: theme.textTheme.labelSmall?.copyWith(
+                        ),
+                        const SizedBox(height: 4),
+
+                        // Mô tả
+                        Text(
+                          description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.4,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Footer: Ngày tạo và dấu chấm trỏ
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.schedule_outlined,
+                              size: 13,
                               color:
-                                  colorScheme.onSurfaceVariant.withOpacity(0.8),
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 0.2,
+                                  colorScheme.onSurfaceVariant.withOpacity(0.7),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 6),
+                            Text(
+                              'Created ${_formatDate(createdAt)}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant
+                                    .withOpacity(0.8),
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
-                // Icon mũi tên bên phải (tuỳ chọn, mang tính điều hướng)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8.0, top: 4.0),
-                  child: Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: colorScheme.onSurface.withOpacity(0.2),
+                  // Icon mũi tên bên phải (tuỳ chọn, mang tính điều hướng)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8.0, top: 4.0),
+                    child: Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: colorScheme.onSurface.withOpacity(0.2),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

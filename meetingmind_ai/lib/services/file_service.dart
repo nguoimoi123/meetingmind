@@ -44,4 +44,12 @@ class FileService {
       throw Exception('Upload failed');
     }
   }
+
+  /// Xoá file
+  static Future<void> deleteFile(String fileId) async {
+    final res = await http.delete(Uri.parse('$BASE_URL/file/delete/$fileId'));
+    if (res.statusCode != 200) {
+      throw Exception('Delete failed');
+    }
+  }
 }

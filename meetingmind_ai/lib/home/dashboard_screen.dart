@@ -19,7 +19,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late String _userId;
 
   // Dữ liệu cho 3 phần
-  List<Meeting> _upcomingMeetings = [];
+  List<Meeting> _recentMeetings = [];
   List<dynamic> _notebooks = [];
 
   bool _isLoading = true;
@@ -61,10 +61,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       setState(() {
         // Lọc ra các cuộc họp sắp tới (từ giờ hiện tại trở đi)
-        _upcomingMeetings = meetings
-            .where((m) => m.date.isAfter(DateTime.now()))
-            .take(3) // Chỉ lấy 3 cái đầu để preview
-            .toList();
+        // Lọc ra các cuộc họp đã qua (từ giờ hiện tại trở về trước)
+        var pastMeetings =
+            meetings.where((m) => m.date.isBefore(DateTime.now())).toList();
+        pastMeetings
+            .sort((a, b) => b.date.compareTo(a.date)); // Sắp xếp mới nhất trước
+        _recentMeetings = pastMeetings.take(3).toList();
 
         _notebooks = notebooks;
         _isLoading = false;
@@ -147,7 +149,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
                   child: Text(
-                    'Upcoming Meetings',
+                    'Recent Meetings',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
@@ -159,17 +161,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   height: 180, // Tăng chiều cao cho thẻ đẹp hơn
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
-                      : _upcomingMeetings.isEmpty
+                      : _recentMeetings.isEmpty
                           ? const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 24),
-                              child: Text("No upcoming meetings found"))
+                              child: Text("No recent meetings found"))
                           : ListView.builder(
                               scrollDirection: Axis.horizontal,
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 24),
-                              itemCount: _upcomingMeetings.length,
+                              itemCount: _recentMeetings.length,
                               itemBuilder: (context, index) {
-                                final meeting = _upcomingMeetings[index];
+                                final meeting = _recentMeetings[index];
                                 return _buildMeetingCard(
                                     meeting, colorScheme, theme, dateFormat);
                               },

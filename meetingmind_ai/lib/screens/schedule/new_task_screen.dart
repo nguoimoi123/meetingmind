@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/services/reminder_service.dart';
 import 'package:meetingmind_ai/services/notification_service.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
-import 'package:meetingmind_ai/models/event_model.dart';
 
 class NewTaskScreen extends StatefulWidget {
   const NewTaskScreen({super.key});

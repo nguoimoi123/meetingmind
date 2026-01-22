@@ -17,4 +17,16 @@ class NotebookListService {
       throw Exception('Failed to load folders: ${response.statusCode}');
     }
   }
+
+  static Future<void> deleteFolder(String folderId) async {
+    final baseUrl = _baseUrl;
+
+    final response = await http.delete(
+      Uri.parse('$baseUrl/folder/delete/$folderId'),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to delete folder: ${response.statusCode}');
+    }
+  }
 }
