@@ -118,7 +118,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
         slivers: [
           // --- APP BAR & SEARCH ---
           SliverAppBar(
-            floating: true,
+            floating: false,
             pinned: true,
             backgroundColor: colorScheme.surface,
             elevation: 0,
