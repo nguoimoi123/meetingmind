@@ -32,4 +32,16 @@ class UserController:
             "created_at": user.created_at.isoformat()
         }, 200
 
+    @staticmethod
+    def change_pass(user_id, old_password, new_password):
+        user = User.objects(id=user_id).first()
+        if not user:
+            return {"error": "User not found"}, 404
+        
+        if not check_password_hash(user.password, old_password):
+            return {"error": "Old password is incorrect"}, 400
+        
+        user.password = generate_password_hash(new_password)
+        user.save()
+        return {"message": "Password changed successfully"}, 200
     

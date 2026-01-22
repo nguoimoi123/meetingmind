@@ -8,6 +8,8 @@ import 'package:meetingmind_ai/providers/auth_provider.dart';
 import 'package:meetingmind_ai/providers/theme_provider.dart';
 import 'package:go_router/go_router.dart';
 
+import '../widgets/siri.dart';
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -35,6 +37,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Color(0xFFEA4335), // Google Red
     Color(0xFFAA00FF), // Deep Purple
     Color(0xFF00BCD4), // Cyan
+  ];
+  final List<Color> _btnGradientColors = const [
+    Color(0xFF6200EA), // Deep Purple
+    Color(0xFF2962FF), // Blue
+    Color(0xFF00BFA5), // Teal
+    Color(0xFF6200EA), // Lặp lại màu đầu để mượt mà
   ];
 
   @override
@@ -96,7 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // --- HEADER ---
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              padding: const EdgeInsets.fromLTRB(24, 40, 24, 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -316,6 +324,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 24.0, right: 16.0),
+        child: FloatingActionButton.extended(
+          onPressed: () {},
+          elevation: 4,
+          backgroundColor: const Color(0xFF2962FF),
+          icon: const Icon(Icons.add, color: Colors.white),
+          label: const Text('New',
+              style:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(50)),
+        ),
       ),
     );
   }

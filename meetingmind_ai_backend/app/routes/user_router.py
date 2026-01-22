@@ -21,3 +21,16 @@ def add_user():
 def get_user(user_id):
     response, status = UserController.get_user(user_id)
     return jsonify(response), status
+
+
+@user_bp.route("/change_password", methods=["POST"])
+def change_password():
+    data = request.get_json()
+    if not data:
+        return {"error": "No data provided"}, 400
+    response, status = UserController.change_pass(
+        user_id=data["user_id"],
+        old_password=data["old_password"],
+        new_password=data["new_password"]
+    )
+    return jsonify(response), status

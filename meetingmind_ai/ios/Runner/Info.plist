@@ -63,14 +63,14 @@
 
 	<!-- Google Sign In -->
 	<key>GIDClientID</key>
-	<string>IOS_CLIENT_ID.apps.googleusercontent.com</string>
+	<string>YOUR_IOS_CLIENT_ID.apps.googleusercontent.com</string>
 
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-			<string>828381156455-k2cht1g24gd4mv8nva7d19r5gh4hje85.apps.googleusercontent.com</string>
+			<string>com.googleusercontent.apps.YOUR_IOS_CLIENT_ID</string>
 			</array>
 		</dict>
 	</array>
