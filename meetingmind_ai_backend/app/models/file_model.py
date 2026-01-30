@@ -13,6 +13,8 @@ class File(db.Document):
 
     size = db.IntField(required=True)
 
+    content = db.StringField()
+
     uploaded_at = db.DateTimeField(default=datetime.utcnow)
     
     meta = {'collection': 'Files'}

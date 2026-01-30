@@ -6,6 +6,8 @@ class Meeting {
   final String time;
   final String status; // 'Completed', 'In Progress'
   final List<String> participants;
+  final String? contextFile; // Path to uploaded context file
+  final String? contextText; // Extracted text from context file
 
   Meeting({
     required this.id,
@@ -15,6 +17,8 @@ class Meeting {
     required this.status,
     required this.time,
     required this.participants,
+    this.contextFile,
+    this.contextText,
   });
 }
 

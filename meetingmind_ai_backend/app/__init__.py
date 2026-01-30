@@ -11,6 +11,7 @@ from .routes.chat_notebook_router import chat_bp
 from .routes.meeting_routes import meeting_bp
 from .routes.chat_routes import bp as chatm_bp
 from .routes.reminder_routes import reminder_bp
+from .routes.report_routes import report_bp
 import app.sockets.meeting_socket
 
 
@@ -31,5 +32,6 @@ def create_app():
     app.register_blueprint(meeting_bp)
     app.register_blueprint(chatm_bp)
     app.register_blueprint(reminder_bp)
+    app.register_blueprint(report_bp)
 
     return app

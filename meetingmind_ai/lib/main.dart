@@ -33,6 +33,7 @@ import 'screens/schedule/schedule_tasks_screen.dart';
 
 import 'screens/meeting/in_meeting_screen.dart';
 import 'screens/meeting/post_meeting_summary_screen.dart';
+import 'screens/meeting/meeting_setup_screen.dart';
 import 'screens/notebook/notebook_detail_screen.dart';
 
 import 'screens/notebook/create_notebook_screen.dart';
@@ -155,7 +156,25 @@ class MyApp extends StatelessWidget {
             // <--- ROUTE TẠO TASK MỚI ---
             GoRoute(
               path: '/app/new_task',
-              builder: (context, state) => const NewTaskScreen(),
+              builder: (context, state) {
+                final extra = state.extra;
+                String? title;
+                String? location;
+                DateTime? startTime;
+                DateTime? endTime;
+                if (extra is Map<String, dynamic>) {
+                  title = extra['title'] as String?;
+                  location = extra['location'] as String?;
+                  startTime = extra['startTime'] as DateTime?;
+                  endTime = extra['endTime'] as DateTime?;
+                }
+                return NewTaskScreen(
+                  initialTitle: title,
+                  initialLocation: location,
+                  initialStartTime: startTime,
+                  initialEndTime: endTime,
+                );
+              },
             ),
             // ---------------------------------
           ],
@@ -163,8 +182,31 @@ class MyApp extends StatelessWidget {
 
         /// OTHER ROUTES OUTSIDE SHELL
         GoRoute(
+          path: '/meeting_setup',
+          builder: (_, __) => const MeetingSetupScreen(),
+        ),
+
+        GoRoute(
           path: '/in_meeting',
-          builder: (_, __) => const InMeetingScreen(),
+          builder: (context, state) {
+            final extra = state.extra;
+            String? title;
+            String? filePath;
+            bool aiAgentEnabled = false;
+            String? openAiKey;
+            if (extra is Map<String, dynamic>) {
+              title = extra['title'] as String?;
+              filePath = extra['filePath'] as String?;
+              aiAgentEnabled = (extra['aiAgentEnabled'] as bool?) ?? false;
+              openAiKey = extra['openAiKey'] as String?;
+            }
+            return InMeetingScreen(
+              title: title,
+              contextFilePath: filePath,
+              aiAgentEnabled: aiAgentEnabled,
+              openAiKey: openAiKey,
+            );
+          },
         ),
 
         GoRoute(

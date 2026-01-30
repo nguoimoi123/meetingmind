@@ -24,7 +24,7 @@ def get_embedding(text):
     return res.data[0].embedding
 class ChatNotebookController:
     @staticmethod
-    def chat_bot_notebook(user_id, folder_id, question, top_k=5):
+    def chat_bot_notebook(user_id, folder_id, question, file_ids=None, top_k=5):
         if not all([user_id, folder_id, question]):
             return {"error": "Missing required fields"}, 400
         
@@ -32,10 +32,15 @@ class ChatNotebookController:
         question_embedding = get_embedding(question)
 
         # Lấy chunk trong folder
-        chunks = Chunk.objects(
+        query = Chunk.objects(
             user_id=user_id,
             folder_id=folder_id
         )
+
+        if isinstance(file_ids, list) and len(file_ids) > 0:
+            query = query.filter(file_id__in=file_ids)
+
+        chunks = query
         
         # Tính similarity
         scored_chunks = []

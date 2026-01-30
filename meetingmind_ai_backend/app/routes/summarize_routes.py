@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from app.services.openai_service import summarize_transcript
-from app.services.meeting_service import get_or_create_meeting, save_summary
+from app.services.meeting_service import get_or_create_meeting, save_summary, apply_speaker_names
 from app.services.rag_service import ingest_meeting_transcript
 
 bp = Blueprint("summarize", __name__)
@@ -17,31 +17,34 @@ def summarize_sid(sid):
     if not meeting.full_transcript:
         return jsonify({"error": "No transcript found in database"}), 400
 
+    # Áp dụng mapping tên người nói (nếu có)
+    updated_transcript = apply_speaker_names(meeting.full_transcript, meeting.speaker_names)
+
     # Nếu đã có summary rồi thì trả về luôn (tránh tính phí OpenAI lại)
     if meeting.summary:
         return jsonify({
             "summary": meeting.summary,
             "action_items": meeting.action_items,
             "key_decisions": meeting.key_decisions,
-            "full_transcript": meeting.full_transcript
+            "full_transcript": updated_transcript
         })
 
     # 2. Gọi OpenAI để tóm tắt
     try:
-        data = summarize_transcript(meeting.full_transcript)
+        data = summarize_transcript(updated_transcript)
         
         # 3. Lưu kết quả vào Meeting DB
         save_summary(sid, data)
         
         # 4. BẮT ĐẦU RAG: Ingest dữ liệu vào bảng Chunks để dùng cho Chat sau này
         # Chạy ngầm hoặc trực tiếp tùy độ dài transcript
-        ingest_meeting_transcript(sid, user_id, meeting.full_transcript)
+        ingest_meeting_transcript(sid, user_id, updated_transcript)
         
         return jsonify({
             "summary": data.get("summary", ""),
             "action_items": data.get("action_items", []),
             "key_decisions": data.get("key_decisions", []),
-            "full_transcript": meeting.full_transcript
+            "full_transcript": updated_transcript
         })
     except Exception as e:
         print(f"Error summarizing: {e}")

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:meetingmind_ai/providers/theme_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -42,6 +43,16 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme colorScheme = theme.colorScheme;
+    final authProvider = context.watch<AuthProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final user = authProvider.googleUser;
+
+    final displayName = user?.displayName?.trim().isNotEmpty == true
+        ? user!.displayName!
+        : 'Guest User';
+    final email = user?.email ?? 'Not signed in';
+    final avatarUrl = user?.photoUrl;
+    final userId = authProvider.userId;
 
     return Scaffold(
       // AppBar sẽ tự động lấy màu từ theme
@@ -62,22 +73,46 @@ class ProfileScreen extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundImage: const NetworkImage(
-                        'https://i.pravatar.cc/150'), // Thay bằng URL avatar thực tế
+                    backgroundImage:
+                        avatarUrl != null ? NetworkImage(avatarUrl) : null,
                     backgroundColor: colorScheme.surface,
+                    child: avatarUrl == null
+                        ? Icon(Icons.person,
+                            size: 48, color: colorScheme.onSurface)
+                        : null,
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'James Anderson',
+                    displayName,
                     style: theme.textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'james.anderson@meetingmind.ai',
+                    email,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurface.withOpacity(0.7),
                     ),
                   ),
+                  if (userId != null && userId!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: colorScheme.primary.withOpacity(0.2)),
+                      ),
+                      child: Text(
+                        'ID: $userId',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ]
                 ],
               ),
             ),
@@ -90,7 +125,7 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.lock_reset,
                 title: 'Change Password',
                 onTap: () {
-                  // TODO: Điều hướng đến màn hình đổi mật khẩu
+                  context.push('/reset_password');
                 },
               ),
               _buildSettingsTile(
@@ -98,7 +133,12 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.credit_card,
                 title: 'Manage Subscription',
                 onTap: () {
-                  // TODO: Điều hướng đến màn hình quản lý đăng ký
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Subscription settings coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                 },
               ),
               _buildSettingsTile(
@@ -106,7 +146,12 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.notifications,
                 title: 'Notifications',
                 onTap: () {
-                  // TODO: Điều hướng đến màn hình cài đặt thông báo
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Notification settings coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                 },
               ),
             ]),
@@ -117,15 +162,13 @@ class ProfileScreen extends StatelessWidget {
                 leading: Icon(Icons.contrast, color: colorScheme.primary),
                 title: Text('Appearance', style: theme.textTheme.bodyLarge),
                 subtitle: Text(
-                  theme.brightness == Brightness.dark ? 'Dark' : 'Light',
+                  themeProvider.isDarkMode ? 'Dark' : 'Light',
                   style: theme.textTheme.bodyMedium,
                 ),
                 trailing: Switch(
-                  value: theme.brightness == Brightness.dark,
+                  value: themeProvider.isDarkMode,
                   onChanged: (value) {
-                    // TODO: Thêm logic chuyển đổi theme
-                    // Cần dùng state management (Provider, Bloc, ...)
-                    print('Switch theme to ${value ? 'Dark' : 'Light'}');
+                    themeProvider.toggleTheme();
                   },
                 ),
               ),
@@ -134,7 +177,12 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.language,
                 title: 'Language',
                 onTap: () {
-                  // TODO: Điều hướng đến màn hình chọn ngôn ngữ
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Language settings coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                 },
               ),
               _buildSettingsTile(
@@ -142,7 +190,12 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.calendar_month,
                 title: 'Default Calendar',
                 onTap: () {
-                  // TODO: Điều hướng đến màn hình chọn lịch mặc định
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Calendar settings coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                 },
               ),
             ]),
@@ -154,7 +207,12 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.help_outline,
                 title: 'FAQ & Help Center',
                 onTap: () {
-                  // TODO: Mở trang web trợ giúp
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Help center coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                 },
               ),
               _buildSettingsTile(
@@ -162,7 +220,12 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.support_agent,
                 title: 'Contact Support',
                 onTap: () {
-                  // TODO: Mở trang web liên hệ hỗ trợ
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Support contact coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                 },
               ),
               _buildSettingsTile(
@@ -170,7 +233,12 @@ class ProfileScreen extends StatelessWidget {
                 icon: Icons.policy,
                 title: 'Privacy Policy',
                 onTap: () {
-                  // TODO: Mở trang web chính sách bảo mật
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Privacy policy coming soon'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
                 },
               ),
             ]),
@@ -183,7 +251,7 @@ class ProfileScreen extends StatelessWidget {
                   // Gọi AuthProvider để logout
                   final authProvider =
                       Provider.of<AuthProvider>(context, listen: false);
-                  //await authProvider.logout();
+                  await authProvider.logout();
 
                   // Điều hướng về màn hình Login
                   context.go('/login');

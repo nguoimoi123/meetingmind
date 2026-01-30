@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from app.services.meeting_service import get_user_meetings
+from app.services.meeting_service import get_user_meetings, update_meeting_meta
 from app.models.meeting_model import Meeting
 from app.models.chunk_model import Chunk
 
@@ -45,4 +45,27 @@ def delete_meeting(sid):
         return jsonify({"message": "Meeting deleted successfully"}), 200
     except Exception as e:
         print(f"Error deleting meeting: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@meeting_bp.route("/<sid>", methods=["PUT"])
+def update_meeting(sid):
+    """
+    Cập nhật thông tin cuộc họp (hiện tại hỗ trợ đổi title).
+    Body: { "title": "My Meeting" }
+    """
+    data = request.get_json() or {}
+    title = data.get("title")
+    user_id = data.get("user_id") or request.args.get("user_id")
+
+    if not title:
+        return jsonify({"error": "Missing title"}), 400
+
+    try:
+        meeting = update_meeting_meta(sid, title=title, user_id=user_id)
+        if not meeting:
+            return jsonify({"error": "Meeting not found"}), 404
+        return jsonify(meeting.to_dict()), 200
+    except Exception as e:
+        print(f"Error updating meeting: {e}")
         return jsonify({"error": str(e)}), 500

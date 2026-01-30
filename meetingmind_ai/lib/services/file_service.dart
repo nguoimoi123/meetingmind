@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
+import 'dart:typed_data';
 
 class FileService {
   // ignore: constant_identifier_names
-  static const String BASE_URL = 'http://192.168.230.243:5000';
+  static const String BASE_URL = 'http://192.168.90.100:5000';
 
   /// Lấy folder + danh sách file
   static Future<Map<String, dynamic>> getFolder(String folderId) async {
@@ -42,5 +43,20 @@ class FileService {
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw Exception('Upload failed');
     }
+  }
+
+  static Future<void> deleteFile(String fileId) async {
+    final res = await http.delete(Uri.parse('$BASE_URL/file/delete/$fileId'));
+    if (res.statusCode != 200) {
+      throw Exception('Delete failed');
+    }
+  }
+
+  static Future<Uint8List> downloadFile(String fileId) async {
+    final res = await http.get(Uri.parse('$BASE_URL/file/download/$fileId'));
+    if (res.statusCode != 200) {
+      throw Exception('Download failed');
+    }
+    return res.bodyBytes;
   }
 }

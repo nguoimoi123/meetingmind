@@ -4,7 +4,7 @@ import '../models/event_model.dart';
 
 class ReminderService {
   static const String _baseUrl =
-      "http://192.168.230.243:5000"; // đổi theo môi trường
+      "http://192.168.90.100:5000"; // đổi theo môi trường
 
   static Future<void> createTask({
     required String userId,

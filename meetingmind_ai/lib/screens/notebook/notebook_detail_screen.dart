@@ -2,8 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:http/http.dart'
-    as http; // Cần thiết cho chức năng delete nếu chưa có trong Service
 import 'package:docx_to_text/docx_to_text.dart';
 
 // Import services và providers từ project của bạn
@@ -17,12 +15,14 @@ class FileItem {
   String name;
   int size;
   String uploadDate;
+  String fileType;
 
   FileItem({
     required this.id,
     required this.name,
     required this.size,
     required this.uploadDate,
+    required this.fileType,
   });
 
   factory FileItem.fromJson(Map<String, dynamic> json) {
@@ -31,6 +31,7 @@ class FileItem {
       name: json['filename'],
       size: json['size'],
       uploadDate: json['uploaded_at'],
+      fileType: json['file_type'] ?? 'txt',
     );
   }
 }
@@ -304,24 +305,61 @@ class _SourcesTabState extends State<SourcesTab> {
     }
   }
 
-  // Xử lý xóa file (Giả sử dùng http trực tiếp nếu Service chưa có hàm delete, hoặc bạn có thể thêm vào FileService)
+  // Xử lý xóa file (Sử dụng FileService)
   Future<void> deleteFile(String fileId) async {
-    // Nếu FileService có deleteFile thì dùng: await FileService.deleteFile(fileId);
-    // Nếu chưa, ta dùng http tương tự code mẫu 2:
-    final url =
-        'YOUR_API_BASE_URL/file/delete/$fileId'; // Thay thế bằng URL thực tế
-    // Lưu ý: Bạn nên di chuyển logic này vào FileService cho sạch
     try {
-      final res = await http.delete(Uri.parse(url));
-      if (res.statusCode == 200) {
-        await _fetchFiles();
-      }
+      await FileService.deleteFile(fileId);
+      await _fetchFiles();
     } catch (e) {
-      print(e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Delete failed: $e'),
+              behavior: SnackBarBehavior.floating),
+        );
+      }
     }
   }
 
-  Future<void> showDeleteConfirm(FileItem file) async {
+  Future<void> _downloadFile(FileItem file) async {
+    try {
+      final bytes = await FileService.downloadFile(file.id);
+      final isMobile = Platform.isAndroid || Platform.isIOS;
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Lưu file',
+        fileName: file.name,
+        allowedExtensions: [file.fileType],
+        bytes: isMobile ? bytes : null,
+      );
+
+      if (savePath != null && !isMobile) {
+        final outFile = File(savePath);
+        await outFile.writeAsBytes(bytes, flush: true);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              savePath != null ? 'Đã tải về: $savePath' : 'Đã lưu file',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tải file thất bại: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<bool> showDeleteConfirm(FileItem file) async {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -346,9 +384,7 @@ class _SourcesTabState extends State<SourcesTab> {
       ),
     );
 
-    if (confirm == true) {
-      await deleteFile(file.id);
-    }
+    return confirm ?? false;
   }
 
   @override
@@ -376,82 +412,101 @@ class _SourcesTabState extends State<SourcesTab> {
 
   Widget _buildFileCard(
       ThemeData theme, ColorScheme colorScheme, FileItem file) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+    return Dismissible(
+      key: Key(file.id),
+      direction: DismissDirection.horizontal,
+      background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        decoration: BoxDecoration(
+          color: Colors.green.shade500,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Icon(
+          Icons.download_rounded,
+          color: Colors.white,
+          size: 28,
+        ),
       ),
-      child: Row(
-        children: [
-          // Icon Container
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(14),
+      secondaryBackground: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: colorScheme.error,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Icon(
+          Icons.delete,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+      confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          await _downloadFile(file);
+          return false;
+        }
+        return await showDeleteConfirm(file);
+      },
+      onDismissed: (direction) {
+        if (direction == DismissDirection.endToStart) {
+          deleteFile(file.id);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.shadow.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-            child: Icon(Icons.description_rounded,
-                color: colorScheme.primary, size: 24),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  file.name,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${formatFileSize(file.size)} • ${getTimeAgo(file.uploadDate)}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          PopupMenuButton<String>(
-            icon: Icon(Icons.more_horiz_rounded,
-                color: colorScheme.onSurfaceVariant),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            onSelected: (value) {
-              if (value == 'delete') showDeleteConfirm(file);
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'delete',
-                child: Row(
-                  children: [
-                    Icon(Icons.delete_outline_rounded,
-                        size: 20, color: colorScheme.error),
-                    const SizedBox(width: 12),
-                    Text('Delete',
-                        style: TextStyle(color: colorScheme.onSurface)),
-                  ],
-                ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Icon Container
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(14),
               ),
-            ],
-          ),
-        ],
+              child: Icon(Icons.description_rounded,
+                  color: colorScheme.primary, size: 24),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    file.name,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${formatFileSize(file.size)} • ${getTimeAgo(file.uploadDate)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -515,6 +570,26 @@ class _AskAITabState extends State<AskAITab> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+  bool _isLoadingFiles = true;
+  List<FileItem> _files = [];
+  final Set<String> _selectedFileIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchFiles();
+  }
+
+  Future<void> _fetchFiles() async {
+    final data = await FileService.getFolder(widget.folderId);
+    final List list = data['files'] ?? [];
+    if (mounted) {
+      setState(() {
+        _files = list.map((e) => FileItem.fromJson(e)).toList();
+        _isLoadingFiles = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -540,6 +615,7 @@ class _AskAITabState extends State<AskAITab> {
         folderId: widget.folderId,
         question: text,
         userId: auth.userId!,
+        fileIds: _selectedFileIds.isEmpty ? null : _selectedFileIds.toList(),
       );
 
       if (mounted) {
@@ -578,6 +654,27 @@ class _AskAITabState extends State<AskAITab> {
 
     return Column(
       children: [
+        if (_isLoadingFiles)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text('Đang tải danh sách file...',
+                    style: theme.textTheme.bodySmall),
+              ],
+            ),
+          )
+        else
+          _buildFileSelector(theme, colorScheme),
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
@@ -605,6 +702,71 @@ class _AskAITabState extends State<AskAITab> {
         ),
         _buildInputArea(theme, colorScheme),
       ],
+    );
+  }
+
+  Widget _buildFileSelector(ThemeData theme, ColorScheme colorScheme) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Chọn file để hỏi AI',
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilterChip(
+                label: const Text('Tất cả'),
+                selected: _selectedFileIds.isEmpty,
+                onSelected: (_) {
+                  setState(() => _selectedFileIds.clear());
+                },
+                selectedColor: colorScheme.primary.withOpacity(0.15),
+              ),
+              ..._files.map((file) {
+                final selected = _selectedFileIds.contains(file.id);
+                return FilterChip(
+                  label: Text(file.name,
+                      overflow: TextOverflow.ellipsis, maxLines: 1),
+                  selected: selected,
+                  onSelected: (value) {
+                    setState(() {
+                      if (value) {
+                        _selectedFileIds.add(file.id);
+                      } else {
+                        _selectedFileIds.remove(file.id);
+                      }
+                    });
+                  },
+                  selectedColor: colorScheme.primary.withOpacity(0.15),
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

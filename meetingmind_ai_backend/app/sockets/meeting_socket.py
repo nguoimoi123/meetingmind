@@ -3,20 +3,23 @@ from flask import request
 from flask_socketio import emit
 from app.extensions import socketio
 from app.services.speechmatics_service import sm_worker
-from app.services.meeting_service import get_or_create_meeting
+from app.services.meeting_service import get_or_create_meeting, update_speaker_name
 
 # Dictionary lưu queue cho từng sid active (chỉ dùng để worker lấy data audio)
 audio_queues = {}
 
 @socketio.on("start_streaming")
-def start_streaming():
+def start_streaming(data=None):
     sid = request.sid
     
     # Lấy user_id từ query params trong socket connect hoặc mặc định
     user_id = request.args.get('user_id', 'default_user')
     
     # 1. Tạo/Cập nhật record Meeting trong DB
-    get_or_create_meeting(sid, user_id)
+    title = None
+    if isinstance(data, dict):
+        title = data.get("title")
+    get_or_create_meeting(sid, user_id, title=title)
     
     # 2. Tạo queue cho sid này
     audio_queues[sid] = queue.Queue()
@@ -42,6 +45,21 @@ def end_meeting():
     sid = request.sid
     if sid in audio_queues:
         audio_queues[sid].put(None)
+
+
+@socketio.on("set_speaker_name")
+def set_speaker_name(data=None):
+    sid = request.sid
+    if not isinstance(data, dict):
+        return
+
+    speaker_id = data.get("speaker_id")
+    name = data.get("name")
+
+    if not speaker_id or not name:
+        return
+
+    update_speaker_name(sid, speaker_id, name)
 
 @socketio.on("disconnect")
 def disconnect():

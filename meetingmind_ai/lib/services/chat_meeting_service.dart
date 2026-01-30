@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ChatService {
-  static const String _baseUrl = 'http://192.168.230.243:5000';
+  static const String _baseUrl = 'http://192.168.90.100:5000';
   final String _currentUserId = "user_123"; // User giả định
 
   Future<String> askAboutMeeting(String sid, String question) async {
