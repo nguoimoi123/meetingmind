@@ -8,6 +8,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 // --- IMPORT SERVICE THÔNG BÁO ---
 import 'services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Providers
 import 'providers/theme_provider.dart';
@@ -20,6 +21,7 @@ import 'theme/app_theme.dart';
 import 'screens/onboarding/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/auth/reset_confirmation_screen.dart';
 
@@ -38,6 +40,9 @@ import 'screens/notebook/notebook_detail_screen.dart';
 
 import 'screens/notebook/create_notebook_screen.dart';
 import 'screens/schedule/new_task_screen.dart';
+import 'screens/search/search_screen.dart';
+import 'screens/team/team_screen.dart';
+import 'screens/team/team_detail_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,8 +86,11 @@ class MyApp extends StatelessWidget {
       redirect: (context, state) {
         final bool loggedIn = auth.isLoggedIn;
         final bool goingToAuth = state.uri.path.startsWith('/login') ||
+            state.uri.path.startsWith('/register') ||
             state.uri.path == '/onboarding' ||
-            state.uri.path == '/splash';
+            state.uri.path == '/splash' ||
+            state.uri.path == '/reset_password' ||
+            state.uri.path == '/reset_confirmation';
 
         // Chưa login → chỉ cho vào splash, onboarding, login
         if (!loggedIn && !goingToAuth) {
@@ -112,6 +120,11 @@ class MyApp extends StatelessWidget {
         GoRoute(
           path: '/login',
           builder: (_, __) => const LoginScreen(),
+        ),
+
+        GoRoute(
+          path: '/register',
+          builder: (_, __) => const RegisterScreen(),
         ),
 
         GoRoute(
@@ -147,6 +160,21 @@ class MyApp extends StatelessWidget {
             GoRoute(
               path: '/app/profile',
               builder: (_, __) => const ProfileScreen(),
+            ),
+            GoRoute(
+              path: '/app/search',
+              builder: (_, __) => const SearchScreen(),
+            ),
+            GoRoute(
+              path: '/app/teams',
+              builder: (_, __) => const TeamScreen(),
+            ),
+            GoRoute(
+              path: '/app/team/:teamId',
+              builder: (context, state) {
+                final teamId = state.pathParameters['teamId']!;
+                return TeamDetailScreen(teamId: teamId);
+              },
             ),
             // Route tạo Notebook (đã có sẵn)
             GoRoute(
@@ -227,6 +255,19 @@ class MyApp extends StatelessWidget {
         ),
       ],
     );
+
+    NotificationService().setOnNotificationTap((payload) async {
+      if (payload == null) return;
+      if (payload.startsWith('team_invite:')) {
+        final teamId = payload.split(':').last;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pending_team_invite', teamId);
+        router.go('/app/teams');
+      } else if (payload.startsWith('team_event:')) {
+        final teamId = payload.split(':').last;
+        router.go('/app/team/$teamId');
+      }
+    });
 
     return Consumer<ThemeProvider>(
       builder: (_, themeProvider, __) {

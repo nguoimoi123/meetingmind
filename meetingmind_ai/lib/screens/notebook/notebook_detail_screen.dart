@@ -9,6 +9,9 @@ import 'package:meetingmind_ai/services/file_service.dart';
 import 'package:meetingmind_ai/services/chat_service.dart';
 import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:meetingmind_ai/config/plan_limits.dart';
+import 'package:meetingmind_ai/widgets/upgrade_dialog.dart';
+import 'package:meetingmind_ai/services/usage_service.dart';
 
 class FileItem {
   String id;
@@ -193,12 +196,16 @@ class _SourcesTabState extends State<SourcesTab> {
   bool _isUploading = false;
   List<FileItem> _files = [];
   late String _userId;
+  String _plan = 'free';
+  Map<String, dynamic> _limits = {};
 
   @override
   void initState() {
     super.initState();
     final auth = Provider.of<AuthProvider>(context, listen: false);
     _userId = auth.userId!;
+    _plan = auth.plan;
+    _limits = auth.limits;
     _fetchFiles();
   }
 
@@ -250,6 +257,18 @@ class _SourcesTabState extends State<SourcesTab> {
   }
 
   Future<void> _pickAndUploadFile() async {
+    final limit = PlanLimits.filesPerFolderLimitFromLimits(_limits) ??
+        PlanLimits.filesPerFolderLimit(_plan);
+    if (limit != null && _files.length >= limit) {
+      if (mounted) {
+        await showUpgradeDialog(
+          context,
+          message: 'File limit reached for $_plan plan. Please upgrade.',
+        );
+      }
+      return;
+    }
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['docx', 'txt', 'md'],
@@ -512,13 +531,19 @@ class _SourcesTabState extends State<SourcesTab> {
   }
 
   Widget _buildUploadCard(ThemeData theme, ColorScheme colorScheme) {
+    final limit = PlanLimits.filesPerFolderLimitFromLimits(_limits) ??
+        PlanLimits.filesPerFolderLimit(_plan);
+    final canUpload = limit == null || _files.length < limit;
+
     return InkWell(
-      onTap: _isUploading ? null : _pickAndUploadFile,
+      onTap: _isUploading || !canUpload ? null : _pickAndUploadFile,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         height: 64,
         decoration: BoxDecoration(
-          color: colorScheme.surface,
+          color: canUpload
+              ? colorScheme.surface
+              : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: colorScheme.outline.withOpacity(0.3),
@@ -541,7 +566,9 @@ class _SourcesTabState extends State<SourcesTab> {
                         color: colorScheme.primary, size: 22),
                     const SizedBox(width: 10),
                     Text(
-                      'Add New Document',
+                      canUpload
+                          ? 'Add New Document'
+                          : 'Limit reached for $_plan',
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
@@ -571,13 +598,39 @@ class _AskAITabState extends State<AskAITab> {
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
   bool _isLoadingFiles = true;
+  bool _isLoadingUsage = true;
   List<FileItem> _files = [];
   final Set<String> _selectedFileIds = {};
+  String _plan = 'free';
+  String _userId = '';
+  Map<String, dynamic> _limits = {};
+  int? _qaRemaining;
 
   @override
   void initState() {
     super.initState();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    _plan = auth.plan;
+    _userId = auth.userId ?? '';
+    _limits = auth.limits;
     _fetchFiles();
+    _fetchUsage();
+  }
+
+  Future<void> _fetchUsage() async {
+    if (_userId.isEmpty) return;
+    setState(() => _isLoadingUsage = true);
+    try {
+      final usage = await UsageService.getUsage(userId: _userId);
+      if (mounted) {
+        setState(() {
+          _qaRemaining = usage['qa_remaining'] as int?;
+          _isLoadingUsage = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingUsage = false);
+    }
   }
 
   Future<void> _fetchFiles() async {
@@ -602,6 +655,20 @@ class _AskAITabState extends State<AskAITab> {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
 
+    final limit =
+        PlanLimits.qaLimitFromLimits(_limits) ?? PlanLimits.qaLimit(_plan);
+    if (limit != null && _qaRemaining != null) {
+      if (_qaRemaining! <= 0) {
+        if (mounted) {
+          await showUpgradeDialog(
+            context,
+            message: 'Q&A limit reached for $_plan plan. Please upgrade.',
+          );
+        }
+        return;
+      }
+    }
+
     setState(() {
       _messages.add(ChatMessage(text: text, isUser: true));
       _isLoading = true;
@@ -624,6 +691,7 @@ class _AskAITabState extends State<AskAITab> {
           _isLoading = false;
         });
       }
+      await _fetchUsage();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -631,6 +699,7 @@ class _AskAITabState extends State<AskAITab> {
           _isLoading = false;
         });
       }
+      await _fetchUsage();
     }
     _scrollToBottom();
   }
@@ -654,6 +723,37 @@ class _AskAITabState extends State<AskAITab> {
 
     return Column(
       children: [
+        if (_isLoadingUsage)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text('Loading usage...', style: theme.textTheme.bodySmall),
+              ],
+            ),
+          )
+        else if (_qaRemaining != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Q&A remaining: $_qaRemaining',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
         if (_isLoadingFiles)
           Padding(
             padding: const EdgeInsets.all(16),

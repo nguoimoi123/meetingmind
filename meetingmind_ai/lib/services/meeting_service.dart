@@ -4,6 +4,7 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
 import '../models/meeting_models.dart';
 import 'package:intl/intl.dart';
+import '../config/api_config.dart';
 
 class MeetingService {
   IO.Socket get socket => _socket!;
@@ -11,7 +12,7 @@ class MeetingService {
   String? meetingTitle;
   String? contextFileContent;
 
-  static const String _serverUrl = 'http://192.168.90.100:5000';
+  static const String _serverUrl = apiBaseUrl;
 
   IO.Socket? _socket;
   final StreamController<TranscriptMessage> _transcriptController =
@@ -156,6 +157,7 @@ class MeetingService {
             participants: List<String>.from(
               json['participants'] ?? ['A', 'B', 'C'],
             ),
+            tags: List<String>.from(json['tags'] ?? []),
           );
         }).toList();
       } else {

@@ -8,4 +8,13 @@ class Folder(db.Document):
     description = db.StringField()
     created_at = db.DateTimeField(default=datetime.utcnow)
     
-    meta = {'collection': 'Folders'}
+    meta = {
+        'collection': 'Folders',
+        'indexes': [
+            'user_id',
+            {
+                'fields': ['$name', '$description'],
+                'default_language': 'none',
+            },
+        ],
+    }

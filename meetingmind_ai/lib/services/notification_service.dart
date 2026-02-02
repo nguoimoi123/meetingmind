@@ -10,6 +10,7 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  void Function(String?)? _onNotificationTap;
 
   Future<void> initialize() async {
     // 1. Cấu hình Android
@@ -31,7 +32,12 @@ class NotificationService {
       iOS: initializationSettingsDarwin,
     );
 
-    await _notificationsPlugin.initialize(initializationSettings);
+    await _notificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (response) {
+        _onNotificationTap?.call(response.payload);
+      },
+    );
 
     // 4. Xin quyền thông báo (Quan trọng cho Android 13+)
     await _notificationsPlugin
@@ -108,5 +114,32 @@ class NotificationService {
 
   Future<void> cancelNotification(int id) async {
     await _notificationsPlugin.cancel(id);
+  }
+
+  Future<void> showNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    final AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'realtime_channel_id',
+      'Realtime Alerts',
+      channelDescription: 'Realtime notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    );
+
+    final NotificationDetails platformDetails =
+        NotificationDetails(android: androidDetails);
+
+    await _notificationsPlugin.show(id, title, body, platformDetails,
+        payload: payload);
+  }
+
+  void setOnNotificationTap(void Function(String? payload) handler) {
+    _onNotificationTap = handler;
   }
 }

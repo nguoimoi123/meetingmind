@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:meetingmind_ai/config/plan_limits.dart';
 import 'package:provider/provider.dart';
 import 'package:record/record.dart';
 import 'package:go_router/go_router.dart';
@@ -33,7 +34,11 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   late MeetingService _meetingService;
   String _meetingTitle = 'Live Meeting';
   String? _contextText;
-  bool get _aiEnabled => widget.aiAgentEnabled;
+  String _plan = 'free';
+  Map<String, dynamic> _limits = {};
+  bool get _aiEnabled =>
+      widget.aiAgentEnabled &&
+      (PlanLimits.aiAgentAllowedFromLimits(_limits) || _plan != 'free');
 
   final TextEditingController _askController = TextEditingController();
   final TextEditingController _chatController = TextEditingController();
@@ -49,6 +54,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   bool _isDialogOpen = false;
   bool _isAskingAi = false;
   bool _isSummarizing = false;
+  Timer? _meetingLimitTimer;
 
   // Animation cho hiệu ứng thu âm
   late AnimationController _pulseController;
@@ -80,7 +86,10 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final userId = context.read<AuthProvider>().userId!;
+    final auth = context.read<AuthProvider>();
+    final userId = auth.userId!;
+    _plan = auth.plan;
+    _limits = auth.limits;
     _meetingTitle = widget.title ?? _meetingTitle;
     _meetingService = MeetingService(userId);
     _connectAndStart();
@@ -121,6 +130,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
 
   @override
   void dispose() {
+    _meetingLimitTimer?.cancel();
     _pulseController.dispose();
     _scrollController.dispose();
     _askController.dispose();
@@ -136,6 +146,23 @@ class _InMeetingScreenState extends State<InMeetingScreen>
 
     _meetingService.connect();
     _meetingService.startStreaming(title: _meetingTitle);
+
+    final limitMinutes = PlanLimits.meetingDurationMinutesFromLimits(_limits) ??
+        PlanLimits.meetingDurationMinutes(_plan);
+    if (limitMinutes != null) {
+      _meetingLimitTimer?.cancel();
+      _meetingLimitTimer = Timer(Duration(minutes: limitMinutes), () async {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Meeting time limit reached for $_plan plan. Ending meeting.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        await _handleEndMeeting();
+      });
+    }
 
     _meetingService.transcriptStream.listen((message) {
       print("📥 Nhận: ${message.speaker}: ${message.text}");

@@ -28,7 +28,7 @@ def google_login():
 
         user = User.objects(email=email).first()
         if not user:
-            user = User(email=email, name=name, avatar=avatar)
+            user = User(email=email, name=name, avatar=avatar, plan="free")
             user.save()
         else:
             user.update(name=name, avatar=avatar)
@@ -38,7 +38,8 @@ def google_login():
             "user_id": str(user.id),
             "email": email,
             "name": name,
-            "avatar": avatar
+            "avatar": avatar,
+            "plan": user.plan
         }), 200
 
     except NotUniqueError:

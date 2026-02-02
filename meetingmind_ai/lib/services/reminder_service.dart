@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/event_model.dart';
+import '../config/api_config.dart';
 
 class ReminderService {
-  static const String _baseUrl =
-      "http://192.168.90.100:5000"; // đổi theo môi trường
+  static const String _baseUrl = apiBaseUrl; // đổi theo môi trường
 
   static Future<void> createTask({
     required String userId,
@@ -36,12 +36,13 @@ class ReminderService {
     required String userId,
     required DateTime date,
   }) async {
+    final tzOffset = DateTime.now().timeZoneOffset.inMinutes;
     final formatted = "${date.year.toString().padLeft(4, '0')}-"
         "${date.month.toString().padLeft(2, '0')}-"
         "${date.day.toString().padLeft(2, '0')}";
 
-    final url =
-        Uri.parse("$_baseUrl/reminder/day?user_id=$userId&date=$formatted");
+    final url = Uri.parse(
+        "$_baseUrl/reminder/day?user_id=$userId&date=$formatted&tz_offset=$tzOffset");
 
     final res = await http.get(url);
 

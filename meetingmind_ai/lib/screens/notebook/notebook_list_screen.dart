@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:meetingmind_ai/services/notebook_list_service.dart';
 import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:meetingmind_ai/config/plan_limits.dart';
+import 'package:meetingmind_ai/widgets/upgrade_dialog.dart';
 
 class NotebookListScreen extends StatefulWidget {
   const NotebookListScreen({super.key});
@@ -122,6 +124,12 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final auth = context.watch<AuthProvider>();
+    final plan = auth.plan;
+    final folderLimit = PlanLimits.folderLimitFromLimits(auth.limits) ??
+        PlanLimits.folderLimit(plan);
+    final canCreateFolder =
+        folderLimit == null || _folders.length < folderLimit;
 
     return Scaffold(
       backgroundColor: colorScheme.surface, // Nền chính
@@ -245,7 +253,16 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 24.0, right: 16.0),
         child: FloatingActionButton.extended(
-          onPressed: () => context.push('/create_notebook'),
+          onPressed: () {
+            if (!canCreateFolder) {
+              showUpgradeDialog(
+                context,
+                message: 'You have reached the notebook limit for $plan plan.',
+              );
+              return;
+            }
+            context.push('/create_notebook');
+          },
           elevation: 4,
           backgroundColor: Color(0xFF2962FF),
           icon: const Icon(Icons.add, color: Colors.white),

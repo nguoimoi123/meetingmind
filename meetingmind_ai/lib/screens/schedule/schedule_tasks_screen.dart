@@ -6,6 +6,7 @@ import 'package:meetingmind_ai/services/reminder_service.dart';
 import 'package:meetingmind_ai/services/notification_service.dart';
 import 'new_task_screen.dart';
 import '../../providers/auth_provider.dart';
+import 'package:meetingmind_ai/widgets/upgrade_dialog.dart';
 
 class ScheduleTasksScreen extends StatefulWidget {
   const ScheduleTasksScreen({super.key});
@@ -99,6 +100,15 @@ class _ScheduleTasksScreenState extends State<ScheduleTasksScreen> {
   }
 
   Future<void> _openAddTaskScreen() async {
+    final plan = context.read<AuthProvider>().plan;
+    if (plan == 'free') {
+      await showUpgradeDialog(
+        context,
+        message: 'Task scheduling is available on Plus and Premium plans.',
+      );
+      return;
+    }
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const NewTaskScreen()),

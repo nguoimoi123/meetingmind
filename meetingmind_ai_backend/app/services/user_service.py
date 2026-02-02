@@ -18,7 +18,12 @@ class UserController:
         )
 
         user.save()
-        return {"id": str(user.id), "name": user.name}, 201
+        return {
+            "id": str(user.id),
+            "name": user.name,
+            "email": user.email,
+            "plan": user.plan,
+        }, 201
     
     @staticmethod
     def get_user(user_id):
@@ -29,7 +34,27 @@ class UserController:
             "id": str(user.id),
             "name": user.name,
             "email": user.email,
+            "plan": user.plan,
             "created_at": user.created_at.isoformat()
+        }, 200
+
+    @staticmethod
+    def login(email, password):
+        user = User.objects(email=email).first()
+        if not user:
+            return {"error": "Invalid credentials"}, 401
+
+        if not user.password:
+            return {"error": "Account uses Google sign-in"}, 400
+
+        if not check_password_hash(user.password, password):
+            return {"error": "Invalid credentials"}, 401
+
+        return {
+            "id": str(user.id),
+            "name": user.name,
+            "email": user.email,
+            "plan": user.plan,
         }, 200
 
     

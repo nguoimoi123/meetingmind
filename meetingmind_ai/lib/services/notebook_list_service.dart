@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class NotebookListService {
-  static const String _baseUrl = 'http://192.168.90.100:5000';
   static Future<List<dynamic>> fetchFolders(String userId) async {
-    const baseUrl = _baseUrl;
+    const baseUrl = apiBaseUrl;
 
     final response = await http.get(
       Uri.parse('$baseUrl/folder/$userId'),
@@ -18,7 +18,7 @@ class NotebookListService {
   }
 
   static Future<void> deleteFolder(String folderId) async {
-    final baseUrl = _baseUrl;
+    final baseUrl = apiBaseUrl;
 
     final response = await http.delete(
       Uri.parse('$baseUrl/folder/delete/$folderId'),

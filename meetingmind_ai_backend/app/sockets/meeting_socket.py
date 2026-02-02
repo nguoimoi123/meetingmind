@@ -4,6 +4,8 @@ from flask_socketio import emit
 from app.extensions import socketio
 from app.services.speechmatics_service import sm_worker
 from app.services.meeting_service import get_or_create_meeting, update_speaker_name
+from app.services.plan_service import get_plan_limits, get_user_plan
+from app.models.meeting_model import Meeting
 
 # Dictionary lưu queue cho từng sid active (chỉ dùng để worker lấy data audio)
 audio_queues = {}
@@ -15,13 +17,28 @@ def start_streaming(data=None):
     # Lấy user_id từ query params trong socket connect hoặc mặc định
     user_id = request.args.get('user_id', 'default_user')
     
-    # 1. Tạo/Cập nhật record Meeting trong DB
+    # 1. Kiểm tra giới hạn cuộc họp theo gói
+    plan = get_user_plan(user_id)
+    limits = get_plan_limits(plan)
+    meeting_limit = limits.get("meeting_limit")
+
+    if meeting_limit is not None:
+        current_count = Meeting.objects(user_id=user_id).count()
+        if current_count >= meeting_limit:
+            emit("status", {
+                "msg": "Meeting limit reached for current plan",
+                "plan": plan,
+                "limit": meeting_limit,
+            })
+            return
+
+    # 2. Tạo/Cập nhật record Meeting trong DB
     title = None
     if isinstance(data, dict):
         title = data.get("title")
     get_or_create_meeting(sid, user_id, title=title)
     
-    # 2. Tạo queue cho sid này
+    # 3. Tạo queue cho sid này
     audio_queues[sid] = queue.Queue()
 
     loop = asyncio.new_event_loop()

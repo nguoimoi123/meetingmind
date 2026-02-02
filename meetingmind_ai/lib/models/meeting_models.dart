@@ -6,6 +6,7 @@ class Meeting {
   final String time;
   final String status; // 'Completed', 'In Progress'
   final List<String> participants;
+  final List<String> tags;
   final String? contextFile; // Path to uploaded context file
   final String? contextText; // Extracted text from context file
 
@@ -17,6 +18,7 @@ class Meeting {
     required this.status,
     required this.time,
     required this.participants,
+    this.tags = const [],
     this.contextFile,
     this.contextText,
   });

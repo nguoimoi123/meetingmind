@@ -107,8 +107,14 @@ def apply_speaker_names(transcript, speaker_names):
     for speaker_id, name in speaker_names.items():
         if not name:
             continue
-        pattern = re.compile(rf"(?m)^{re.escape(speaker_id)}\s*:")
-        updated = pattern.sub(f"{name}:", updated)
+        # Replace both raw speaker_id and prefixed "Người {speaker_id}"
+        candidates = {speaker_id}
+        if not str(speaker_id).startswith("Người "):
+            candidates.add(f"Người {speaker_id}")
+
+        for candidate in candidates:
+            pattern = re.compile(rf"(?m)^{re.escape(candidate)}\s*:")
+            updated = pattern.sub(f"{name}:", updated)
     return updated
 def delete_meeting_by_sid(sid):
     meeting = Meeting.objects(sid=sid).first()

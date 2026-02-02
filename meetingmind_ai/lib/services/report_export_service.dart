@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class ReportExportService {
-  static const String _baseUrl = 'http://192.168.90.100:5000';
+  static const String _baseUrl = apiBaseUrl;
 
   static Future<Uint8List> generateDocxBytes({
     required String title,

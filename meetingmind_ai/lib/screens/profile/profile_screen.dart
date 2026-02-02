@@ -1,11 +1,174 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:meetingmind_ai/services/subscription_service.dart';
 import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/providers/theme_provider.dart';
+import 'package:meetingmind_ai/config/plan_limits.dart';
+import 'package:meetingmind_ai/services/usage_service.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  String _limitText(int? limit) => limit == null ? 'Unlimited' : '$limit';
+
+  Future<Map<String, dynamic>?> _getUsage(String userId) async {
+    try {
+      return await UsageService.getUsage(userId: userId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _showUpgradeSheet(
+    BuildContext context, {
+    required String userId,
+    required String currentPlan,
+  }) async {
+    final codeController = TextEditingController();
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        bool isLoading = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            Future<void> redeem() async {
+              final code = codeController.text.trim();
+              if (code.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please enter a code')),
+                );
+                return;
+              }
+
+              setState(() => isLoading = true);
+              try {
+                final plan = await SubscriptionService.redeemCode(
+                  userId: userId,
+                  code: code,
+                );
+                await context.read<AuthProvider>().setPlan(plan);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Upgraded to $plan')),
+                  );
+                  Navigator.pop(context);
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.toString())),
+                  );
+                }
+              } finally {
+                if (context.mounted) {
+                  setState(() => isLoading = false);
+                }
+              }
+            }
+
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.85,
+              minChildSize: 0.5,
+              maxChildSize: 0.95,
+              builder: (context, scrollController) {
+                return SingleChildScrollView(
+                  controller: scrollController,
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom,
+                      left: 20,
+                      right: 20,
+                      top: 16,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Upgrade Plan',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Current: $currentPlan'),
+                        const SizedBox(height: 16),
+                        _buildPlanCard(
+                          context: context,
+                          title: 'Free',
+                          price: '0₫ / month',
+                          showPrice: true,
+                          highlighted: currentPlan == 'free',
+                          features: const [
+                            'Up to 10 meetings/month',
+                            '30 minutes per meeting',
+                            '5 folders, 5 files each',
+                            'Q&A: 30 questions/month',
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildPlanCard(
+                          context: context,
+                          title: 'Plus',
+                          price: '99,000₫ / month',
+                          showPrice: true,
+                          highlighted: currentPlan == 'plus',
+                          features: const [
+                            'Up to 50 meetings/month',
+                            'Up to 4 hours per meeting',
+                            '50 folders, 50 files each',
+                            'Q&A: 500 questions/month',
+                            'Basic AI agent',
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildPlanCard(
+                          context: context,
+                          title: 'Premium',
+                          price: '199,000₫ / month',
+                          showPrice: true,
+                          highlighted: currentPlan == 'premium',
+                          features: const [
+                            'Unlimited meetings & duration',
+                            'Unlimited folders & files',
+                            'Unlimited Q&A',
+                            'Full AI agent',
+                            'In-meeting AI assistant',
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: codeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Enter code to redeem',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: isLoading ? null : redeem,
+                            child: const Text('Redeem Code'),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
 
   // Widget helper để tạo một nhóm các ô cài đặt
   Widget _buildSettingsGroup(List<Widget> children) {
@@ -39,6 +202,75 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildPlanCard({
+    required BuildContext context,
+    required String title,
+    required List<String> features,
+    required bool highlighted,
+    String? price,
+    bool showPrice = false,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? colorScheme.primary.withOpacity(0.08)
+            : colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: highlighted
+              ? colorScheme.primary.withOpacity(0.5)
+              : colorScheme.outline.withOpacity(0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          if (showPrice && price != null)
+            Text(
+              price,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          const SizedBox(height: 12),
+          ...features.map(
+            (f) => Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.check_circle,
+                      size: 16, color: colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      f,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withOpacity(0.8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
@@ -46,13 +278,27 @@ class ProfileScreen extends StatelessWidget {
     final authProvider = context.watch<AuthProvider>();
     final themeProvider = context.watch<ThemeProvider>();
     final user = authProvider.googleUser;
+    final localName = authProvider.name?.trim();
+    final localEmail = authProvider.email?.trim();
 
     final displayName = user?.displayName?.trim().isNotEmpty == true
         ? user!.displayName!
-        : 'Guest User';
-    final email = user?.email ?? 'Not signed in';
+        : (localName != null && localName.isNotEmpty
+            ? localName
+            : (authProvider.isLoggedIn ? 'User' : 'Guest User'));
+    final email = user?.email ??
+        (localEmail?.isNotEmpty == true
+            ? localEmail!
+            : (authProvider.isLoggedIn ? 'Signed in' : 'Not signed in'));
     final avatarUrl = user?.photoUrl;
     final userId = authProvider.userId;
+    final plan = authProvider.plan;
+    final limits = authProvider.limits;
+    final meetingLimit = PlanLimits.fromLimits(limits, 'meeting_limit');
+    final meetingDuration = PlanLimits.meetingDurationMinutesFromLimits(limits);
+    final folderLimit = PlanLimits.folderLimitFromLimits(limits);
+    final filesPerFolder = PlanLimits.filesPerFolderLimitFromLimits(limits);
+    final qaLimit = PlanLimits.qaLimitFromLimits(limits);
 
     return Scaffold(
       // AppBar sẽ tự động lấy màu từ theme
@@ -93,6 +339,24 @@ class ProfileScreen extends StatelessWidget {
                       color: colorScheme.onSurface.withOpacity(0.7),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: colorScheme.secondary.withOpacity(0.2)),
+                    ),
+                    child: Text(
+                      'Plan: $plan',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.secondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                   if (userId != null && userId!.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
@@ -116,7 +380,65 @@ class ProfileScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 24),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Plan Limits',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      Text('Meetings/month: ${_limitText(meetingLimit)}'),
+                      Text(
+                          'Meeting duration: ${_limitText(meetingDuration)} min'),
+                      Text('Folders: ${_limitText(folderLimit)}'),
+                      Text('Files/folder: ${_limitText(filesPerFolder)}'),
+                      const SizedBox(height: 12),
+                      if (userId != null && userId!.isNotEmpty)
+                        FutureBuilder<Map<String, dynamic>?>(
+                          future: _getUsage(userId!),
+                          builder: (context, snapshot) {
+                            final data = snapshot.data;
+                            final meetingsRemaining =
+                                data?['meetings_remaining'] as int?;
+                            final qaRemaining = data?['qa_remaining'] as int?;
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (meetingsRemaining != null)
+                                  Text(
+                                      'Meetings remaining: $meetingsRemaining'),
+                                if (meetingsRemaining == null &&
+                                    meetingLimit == null)
+                                  const Text('Meetings remaining: Unlimited'),
+                                if (qaRemaining != null)
+                                  Text('Q&A remaining: $qaRemaining'
+                                      '${qaLimit != null ? ' / $qaLimit' : ''}'),
+                                if (qaRemaining == null && qaLimit == null)
+                                  const Text('Q&A remaining: Unlimited'),
+                              ],
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 16),
 
             // --- Nhóm Cài đặt Tài khoản ---
             _buildSettingsGroup([
@@ -130,14 +452,31 @@ class ProfileScreen extends StatelessWidget {
               ),
               _buildSettingsTile(
                 context: context,
+                icon: Icons.groups_rounded,
+                title: 'Team Scheduling',
+                onTap: () {
+                  context.push('/app/teams');
+                },
+              ),
+              _buildSettingsTile(
+                context: context,
                 icon: Icons.credit_card,
                 title: 'Manage Subscription',
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Subscription settings coming soon'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
+                  if (userId == null || userId!.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please log in first'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+
+                  _showUpgradeSheet(
+                    context,
+                    userId: userId!,
+                    currentPlan: plan,
                   );
                 },
               ),

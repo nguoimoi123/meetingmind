@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meetingmind_ai/services/create_notebook_service.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:meetingmind_ai/config/plan_limits.dart';
+import 'package:meetingmind_ai/services/notebook_list_service.dart';
+import 'package:meetingmind_ai/widgets/upgrade_dialog.dart';
 import 'package:provider/provider.dart';
 
 class CreateNotebookScreen extends StatefulWidget {
@@ -82,6 +85,29 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
 
     FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
+
+    final auth = context.read<AuthProvider>();
+    final plan = auth.plan;
+    final folderLimit = PlanLimits.folderLimitFromLimits(auth.limits) ??
+        PlanLimits.folderLimit(plan);
+    if (folderLimit != null) {
+      try {
+        final folders = await NotebookListService.fetchFolders(_userId);
+        if (folders.length >= folderLimit) {
+          if (mounted) {
+            await showUpgradeDialog(
+              context,
+              message: 'Notebook limit reached for $plan plan. Please upgrade.',
+            );
+          }
+          if (mounted) setState(() => _isLoading = false);
+          return;
+        }
+      } catch (_) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+    }
 
     try {
       await NotebookService.createNotebook(

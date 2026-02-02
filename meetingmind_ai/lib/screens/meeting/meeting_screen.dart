@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
 import 'package:meetingmind_ai/services/meeting_service.dart';
+import 'package:meetingmind_ai/services/meeting_management_service.dart';
 import 'package:meetingmind_ai/models/meeting_models.dart';
 import 'package:provider/provider.dart';
 
@@ -18,6 +19,7 @@ class _MeetingScreenState extends State<MeetingScreen> {
   List<Meeting> _meetings = [];
   bool _isLoading = true;
   String _searchQuery = "";
+  String? _selectedTag;
   late String _userId;
 
   // Màu sắc rực rỡ dùng cho UI
@@ -54,6 +56,96 @@ class _MeetingScreenState extends State<MeetingScreen> {
       print("Error loading meetings: $e");
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  List<String> _collectTags() {
+    final tags = <String>{};
+    for (final meeting in _meetings) {
+      for (final tag in meeting.tags) {
+        final clean = tag.trim();
+        if (clean.isNotEmpty) tags.add(clean);
+      }
+    }
+    final list = tags.toList()..sort();
+    return list;
+  }
+
+  Future<void> _editTags(Meeting meeting) async {
+    final controller = TextEditingController(text: meeting.tags.join(', '));
+    final theme = Theme.of(context);
+
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Edit tags'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'tag1, tag2, tag3',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final tags = controller.text
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList();
+              Navigator.pop(context, tags);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == null) return;
+
+    try {
+      final updated = await MeetingManagementService.updateMeetingTags(
+        sid: meeting.id,
+        tags: result,
+      );
+      if (mounted) {
+        setState(() {
+          final index = _meetings.indexWhere((m) => m.id == meeting.id);
+          if (index != -1) {
+            _meetings[index] = Meeting(
+              id: meeting.id,
+              title: meeting.title,
+              subtitle: meeting.subtitle,
+              date: meeting.date,
+              status: meeting.status,
+              time: meeting.time,
+              participants: meeting.participants,
+              tags: updated,
+              contextFile: meeting.contextFile,
+              contextText: meeting.contextText,
+            );
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Tags updated'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: theme.colorScheme.secondary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update tags: $e')),
+        );
+      }
     }
   }
 
@@ -109,8 +201,13 @@ class _MeetingScreenState extends State<MeetingScreen> {
     final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
 
     final filteredMeetings = _meetings.where((m) {
-      return m.title.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesQuery =
+          m.title.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesTag = _selectedTag == null || m.tags.contains(_selectedTag);
+      return matchesQuery && matchesTag;
     }).toList();
+
+    final tags = _collectTags();
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -170,7 +267,38 @@ class _MeetingScreenState extends State<MeetingScreen> {
                 ),
               ),
             ),
+            actions: [
+              IconButton(
+                tooltip: 'Search everything',
+                icon: const Icon(Icons.travel_explore_rounded),
+                onPressed: () => context.push('/app/search'),
+              ),
+            ],
           ),
+          if (tags.isNotEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('All'),
+                      selected: _selectedTag == null,
+                      onSelected: (_) => setState(() => _selectedTag = null),
+                    ),
+                    ...tags.map(
+                      (tag) => ChoiceChip(
+                        label: Text(tag),
+                        selected: _selectedTag == tag,
+                        onSelected: (_) => setState(() => _selectedTag = tag),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // --- LIST CONTENT ---
           if (_isLoading)
             const SliverFillRemaining(
@@ -312,6 +440,11 @@ class _MeetingScreenState extends State<MeetingScreen> {
                   ),
                 ),
                 const SizedBox(width: 12),
+                IconButton(
+                  tooltip: 'Edit tags',
+                  onPressed: () => _editTags(meeting),
+                  icon: const Icon(Icons.sell_outlined),
+                ),
                 // Icon trạng thái được tô màu rực rỡ
                 Container(
                   padding:
@@ -337,6 +470,20 @@ class _MeetingScreenState extends State<MeetingScreen> {
                 ),
               ],
             ),
+            if (meeting.tags.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: meeting.tags
+                    .take(4)
+                    .map((t) => Chip(
+                          label: Text(t),
+                          visualDensity: VisualDensity.compact,
+                        ))
+                    .toList(),
+              ),
+            ],
             const SizedBox(height: 20),
 
             // Thông tin thời gian với Icon màu sống động

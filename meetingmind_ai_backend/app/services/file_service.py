@@ -3,6 +3,7 @@ from docx import Document
 from ..models.file_model import File
 from ..models.folder_model import Folder
 from ..models.chunk_model import Chunk
+from ..services.plan_service import get_plan_limits, get_user_plan
 
 from openai import OpenAI
 import os
@@ -48,6 +49,18 @@ class FileController:
     def upload_file(user_id, folder_id, filename, file_type, size, content):
         if not all([user_id, folder_id, filename, file_type, size, content]):
             return {"error": "All file details are required"}, 400
+
+        plan = get_user_plan(user_id)
+        limits = get_plan_limits(plan)
+        files_limit = limits.get("files_per_folder_limit")
+        if files_limit is not None:
+            current_count = File.objects(folder_id=folder_id).count()
+            if current_count >= files_limit:
+                return {
+                    "error": "File limit reached for current plan",
+                    "plan": plan,
+                    "limit": files_limit,
+                }, 403
 
         # Tạo File object
         file = File(

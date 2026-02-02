@@ -1,14 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class NotebookService {
-  static const String _baseUrl = 'http://192.168.90.100:5000';
   static Future<void> createNotebook({
     required String userId,
     required String name,
     required String description,
   }) async {
-    const String apiUrl = '$_baseUrl/folder/add';
+    const String apiUrl = '$apiBaseUrl/folder/add';
 
     final response = await http.post(
       Uri.parse(apiUrl),

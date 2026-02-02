@@ -3,6 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:meetingmind_ai/config/ai_keys.dart';
+import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:provider/provider.dart';
+import 'package:meetingmind_ai/config/plan_limits.dart';
+import 'package:meetingmind_ai/widgets/upgrade_dialog.dart';
 
 class MeetingSetupScreen extends StatefulWidget {
   const MeetingSetupScreen({super.key});
@@ -127,6 +131,18 @@ class _MeetingSetupScreenState extends State<MeetingSetupScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final auth = context.watch<AuthProvider>();
+    final plan = auth.plan;
+    final canUseAiAgent = PlanLimits.aiAgentAllowedFromLimits(auth.limits) ||
+        PlanLimits.aiAgentAllowed(plan);
+
+    if (!canUseAiAgent && _aiAgentEnabled) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() => _aiAgentEnabled = false);
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
@@ -311,80 +327,121 @@ class _MeetingSetupScreenState extends State<MeetingSetupScreen> {
 
             const SizedBox(height: 40),
 
-            // --- SECTION 3: AI AGENT ---
-            Row(
-              children: [
-                Switch(
-                  value: _aiAgentEnabled,
-                  activeColor: _vibrantBlue,
-                  onChanged: (v) => setState(() => _aiAgentEnabled = v),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'AI Agent (optional)',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
+            if (canUseAiAgent) ...[
+              // --- SECTION 3: AI AGENT ---
+              Row(
+                children: [
+                  Switch(
+                    value: _aiAgentEnabled,
+                    activeColor: _vibrantBlue,
+                    onChanged: (v) => setState(() => _aiAgentEnabled = v),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI Agent (optional)',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'AI will answer questions using the uploaded file only.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                        const SizedBox(height: 4),
+                        Text(
+                          'AI will answer questions using the uploaded file only.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              if (_aiAgentEnabled) ...[
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _openAiKeyController,
+                  decoration: InputDecoration(
+                    hintText: 'Enter OpenAI API Key (sk-...)',
+                    filled: true,
+                    fillColor: colorScheme.surfaceContainerHighest,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    prefixIcon: Icon(Icons.vpn_key_rounded,
+                        color: _vibrantBlue.withOpacity(0.7)),
+                  ),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _vibrantBlue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: _vibrantBlue, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Key is used locally to call OpenAI. Make sure it has access to your uploaded doc context only.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
-            ),
-
-            if (_aiAgentEnabled) ...[
-              const SizedBox(height: 12),
-              TextField(
-                controller: _openAiKeyController,
-                decoration: InputDecoration(
-                  hintText: 'Enter OpenAI API Key (sk-...)',
-                  filled: true,
-                  fillColor: colorScheme.surfaceContainerHighest,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide.none,
+            ],
+            if (!canUseAiAgent) ...[
+              Row(
+                children: [
+                  Switch(
+                    value: false,
+                    activeColor: _vibrantBlue,
+                    onChanged: (_) async {
+                      await showUpgradeDialog(
+                        context,
+                        message:
+                            'AI Agent is available on Plus and Premium plans.',
+                      );
+                    },
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  prefixIcon: Icon(Icons.vpn_key_rounded,
-                      color: _vibrantBlue.withOpacity(0.7)),
-                ),
-                obscureText: true,
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: _vibrantBlue.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: _vibrantBlue, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Key is used locally to call OpenAI. Make sure it has access to your uploaded doc context only.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI Agent (locked)',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Upgrade to Plus or Premium to enable AI Agent.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
 

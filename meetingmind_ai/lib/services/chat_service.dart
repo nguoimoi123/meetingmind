@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 class ChatService {
-  static const String BASE_URL = 'http://192.168.90.100:5000';
-
   static Future<String> ask({
     required String userId,
     required String folderId,
@@ -11,7 +10,7 @@ class ChatService {
     List<String>? fileIds,
   }) async {
     final res = await http.post(
-      Uri.parse('$BASE_URL/chat/notebook'),
+      Uri.parse('$apiBaseUrl/chat/notebook'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'user_id': userId,

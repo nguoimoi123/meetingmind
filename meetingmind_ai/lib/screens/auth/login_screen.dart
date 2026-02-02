@@ -4,9 +4,26 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/services/google_auth_service.dart';
+import 'package:meetingmind_ai/services/auth_service.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +140,7 @@ class LoginScreen extends StatelessWidget {
                       icon: Icons.email_outlined,
                       hintText: 'Email Address',
                       keyboardType: TextInputType.emailAddress,
+                      controller: _emailController,
                     ),
                     const SizedBox(height: 20),
 
@@ -133,6 +151,7 @@ class LoginScreen extends StatelessWidget {
                       hintText: 'Password',
                       obscureText: true,
                       suffixIcon: Icons.visibility_outlined,
+                      controller: _passwordController,
                     ),
                     const SizedBox(height: 12),
 
@@ -170,10 +189,56 @@ class LoginScreen extends StatelessWidget {
                         ],
                       ),
                       child: ElevatedButton(
-                        onPressed: () {
-                          context.read<AuthProvider>().login();
-                          context.go('/app/home');
-                        },
+                        onPressed: _isLoading
+                            ? null
+                            : () async {
+                                final email = _emailController.text.trim();
+                                final password =
+                                    _passwordController.text.trim();
+
+                                if (email.isEmpty || password.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                          'Please enter email and password'),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                setState(() => _isLoading = true);
+                                try {
+                                  final data = await AuthService.login(
+                                    email: email,
+                                    password: password,
+                                  );
+
+                                  await context
+                                      .read<AuthProvider>()
+                                      .loginWithCredentials(
+                                        userId: data['id']?.toString() ?? '',
+                                        email: data['email']?.toString(),
+                                        name: data['name']?.toString(),
+                                        plan: data['plan']?.toString(),
+                                      );
+
+                                  if (mounted) {
+                                    context.go('/app/home');
+                                  }
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(e.toString()),
+                                      ),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) {
+                                    setState(() => _isLoading = false);
+                                  }
+                                }
+                              },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
                           shadowColor: Colors.transparent,
@@ -181,14 +246,23 @@ class LoginScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: const Text(
-                          'Log In',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Log In',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -232,15 +306,17 @@ class LoginScreen extends StatelessWidget {
 
                             if (idToken != null) {
                               print("Got ID Token, sending to backend...");
-                              final userId =
+                              final data =
                                   await googleAuth.sendTokenToBackend(idToken);
 
-                              if (userId != null) {
-                                Provider.of<AuthProvider>(context,
+                              if (data != null) {
+                                await Provider.of<AuthProvider>(context,
                                         listen: false)
                                     .loginWithGoogle(
                                   user: await GoogleSignIn().signInSilently(),
-                                  userIdFromBackend: userId,
+                                  userIdFromBackend:
+                                      data['user_id']?.toString() ?? '',
+                                  plan: data['plan']?.toString(),
                                 );
                                 context.go('/app/home');
                               } else {
@@ -276,7 +352,7 @@ class LoginScreen extends StatelessWidget {
 
             // Sign up
             TextButton(
-              onPressed: () => Navigator.pushNamed(context, '/onboarding'),
+              onPressed: () => context.go('/register'),
               child: Text.rich(
                 TextSpan(
                   style: theme.textTheme.bodyMedium?.copyWith(
@@ -310,9 +386,11 @@ class LoginScreen extends StatelessWidget {
     TextInputType? keyboardType,
     bool obscureText = false,
     IconData? suffixIcon,
+    TextEditingController? controller,
   }) {
     final theme = Theme.of(context);
     return TextField(
+      controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
       style: theme.textTheme.bodyLarge,

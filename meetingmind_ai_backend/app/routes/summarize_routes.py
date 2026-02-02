@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from app.services.openai_service import summarize_transcript
 from app.services.meeting_service import get_or_create_meeting, save_summary, apply_speaker_names
 from app.services.rag_service import ingest_meeting_transcript
+from app.services.reminder_service import ReminderController
 
 bp = Blueprint("summarize", __name__)
 
@@ -40,6 +41,15 @@ def summarize_sid(sid):
         # Chạy ngầm hoặc trực tiếp tùy độ dài transcript
         ingest_meeting_transcript(sid, user_id, updated_transcript)
         
+        # 5. Optionally create tasks from action items
+        create_tasks = request.args.get("create_tasks", "false").lower() == "true"
+        if create_tasks and data.get("action_items"):
+            items = [{"title": x} for x in data.get("action_items")]
+            ReminderController.create_reminders_from_action_items(
+                user_id=user_id,
+                items=items,
+            )
+
         return jsonify({
             "summary": data.get("summary", ""),
             "action_items": data.get("action_items", []),

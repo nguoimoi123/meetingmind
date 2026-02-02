@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/services/meeting_service.dart'; // Import service
 import 'package:meetingmind_ai/services/notebook_list_service.dart';
+import 'package:meetingmind_ai/services/meeting_management_service.dart';
 import 'package:meetingmind_ai/models/meeting_models.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +25,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<dynamic> _notebooks = [];
 
   bool _isLoading = true;
+  bool _agendaLoading = false;
 
   // =================================================================
   // PALETTE MÀU SẮC SỐNG ĐỘNG (Vibrant Palette)
@@ -76,6 +78,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
       setState(() => _isLoading = false);
     }
   }
+
+  Future<void> _showAgendaSuggestions() async {
+    if (_agendaLoading) return;
+    setState(() => _agendaLoading = true);
+
+    try {
+      final data = await MeetingManagementService.getNextAgenda(
+        userId: _userId,
+        limit: 5,
+      );
+
+      if (!mounted) return;
+
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) {
+          final agendaItems = (data['agenda_items'] as List?) ?? [];
+          final goals = (data['goals'] as List?) ?? [];
+          final risks = (data['risks'] as List?) ?? [];
+          final followUps = (data['follow_ups'] as List?) ?? [];
+
+          Widget buildList(String title, List items) {
+            if (items.isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  ...items.map((e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.check_circle_outline, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(e.toString())),
+                          ],
+                        ),
+                      )),
+                ],
+              ),
+            );
+          }
+
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('AI Agenda Suggestions',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    buildList('Agenda Items', agendaItems),
+                    buildList('Goals', goals),
+                    buildList('Risks', risks),
+                    buildList('Follow-ups', followUps),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể lấy agenda: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _agendaLoading = false);
+    }
+  }
   // -------------------------------
 
   @override
@@ -86,9 +179,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final authProvider = context.watch<AuthProvider>();
     final user = authProvider.googleUser;
     final rawName = user?.displayName?.trim();
+    final localName = authProvider.name?.trim();
     final displayName = (rawName != null && rawName.isNotEmpty)
         ? rawName.split(RegExp(r'\s+')).first
-        : 'User';
+        : (localName != null && localName.isNotEmpty
+            ? localName.split(RegExp(r'\s+')).first
+            : (authProvider.isLoggedIn ? 'User' : 'Guest'));
     final avatarUrl = user?.photoUrl;
 
     final hour = DateTime.now().hour;
@@ -282,6 +378,66 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       icon: Icon(Icons.arrow_forward,
                           color: colorScheme.onSurface),
                     ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // --- AI AGENDA SUGGESTIONS ---
+          SliverToBoxAdapter(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(24, 4, 24, 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: const Color(0xFF2962FF).withOpacity(0.1),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2962FF).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.auto_awesome_rounded,
+                        color: Color(0xFF2962FF), size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'AI Agenda Suggestions',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Get ideas for your next meeting agenda',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _agendaLoading ? null : _showAgendaSuggestions,
+                    icon: _agendaLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.arrow_forward_rounded),
                   ),
                 ],
               ),
