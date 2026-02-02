@@ -63,3 +63,5 @@ app.*.map.json
 # Linux
 **/linux/flutter/ephemeral/
 **/linux/.plugin_symlinks/
+
+meetingmind_ai/lib/config/ai_keys.dart
