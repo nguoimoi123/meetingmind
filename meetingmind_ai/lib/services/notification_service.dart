@@ -11,6 +11,7 @@ class NotificationService {
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  void Function(String?)? _onNotificationTap;
 
   // ID kênh thông báo
   static const String _channelId = 'meetingmind_channel';
@@ -42,7 +43,12 @@ class NotificationService {
       iOS: initializationSettingsDarwin,
     );
 
-    await _notificationsPlugin.initialize(initializationSettings);
+    await _notificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (response) {
+        _onNotificationTap?.call(response.payload);
+      },
+    );
 
     // 5. Xin quyền (Android 13+)
     await requestPermissions();
@@ -163,8 +169,30 @@ class NotificationService {
     await _notificationsPlugin.cancel(id);
   }
 
-  // Hàm hủy tất cả thông báo (Rất hữu ích khi người dùng logout hoặc xóa task hàng loạt)
-  Future<void> cancelAll() async {
-    await _notificationsPlugin.cancelAll();
+  Future<void> showNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    final AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'realtime_channel_id',
+      'Realtime Alerts',
+      channelDescription: 'Realtime notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+      icon: '@mipmap/ic_launcher',
+    );
+
+    final NotificationDetails platformDetails =
+        NotificationDetails(android: androidDetails);
+
+    await _notificationsPlugin.show(id, title, body, platformDetails,
+        payload: payload);
+  }
+
+  void setOnNotificationTap(void Function(String? payload) handler) {
+    _onNotificationTap = handler;
   }
 }

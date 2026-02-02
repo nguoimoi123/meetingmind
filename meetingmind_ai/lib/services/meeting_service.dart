@@ -3,14 +3,15 @@ import 'dart:convert';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import '../models/meeting_models.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/api_config.dart';
 
 class MeetingService {
   IO.Socket get socket => _socket!;
   String? meetingSid;
+  String? meetingTitle;
+  String? contextFileContent;
 
-  static final String? _serverUrl = dotenv.env['API_BASE_URL'];
+  static const String _serverUrl = apiBaseUrl;
 
   IO.Socket? _socket;
   final StreamController<TranscriptMessage> _transcriptController =
@@ -48,6 +49,7 @@ class MeetingService {
       print("🆔 Socket SID = $meetingSid");
       print('Connected to Server');
       _statusController.add('Connected');
+      _syncMeetingMeta();
     });
 
     _socket!.on('disconnect', (_) {
@@ -75,8 +77,13 @@ class MeetingService {
     _socket = null;
   }
 
-  void startStreaming() {
-    _socket?.emit('start_streaming');
+  void startStreaming({String? title}) {
+    final payloadTitle = (title ?? meetingTitle)?.trim();
+    if (payloadTitle != null && payloadTitle.isNotEmpty) {
+      _socket?.emit('start_streaming', {'title': payloadTitle});
+    } else {
+      _socket?.emit('start_streaming');
+    }
     _isRecording = true;
     _statusController.add('Recording started');
   }
@@ -93,7 +100,40 @@ class MeetingService {
     _statusController.add('Recording stopped');
   }
 
-  // API LẤY DANH SÁCH CỰA HỌP (Thay vì Mock)
+  void setSpeakerName({required String speakerId, required String name}) {
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('set_speaker_name', {
+        'speaker_id': speakerId,
+        'name': name,
+      });
+    }
+  }
+
+  Future<void> setMeetingContext(
+      {required String title, String? context}) async {
+    meetingTitle = title;
+    contextFileContent = context;
+    await _syncMeetingMeta();
+  }
+
+  Future<void> _syncMeetingMeta() async {
+    if (meetingSid == null || meetingTitle == null) return;
+    final uri = Uri.parse('$_serverUrl/meetings/$meetingSid?user_id=$userId');
+    try {
+      final response = await http.put(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'title': meetingTitle}),
+      );
+      if (response.statusCode != 200) {
+        print("Failed to sync meeting meta: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Error syncing meeting meta: $e");
+    }
+  }
+
+  // API: lấy danh sách cuộc họp
   Future<List<Meeting>> getPastMeetings() async {
     final uri = Uri.parse('$_serverUrl/meetings?user_id=$userId');
 
@@ -110,12 +150,13 @@ class MeetingService {
             title: json['title'],
             subtitle:
                 json['status'] == 'completed' ? 'Completed' : 'In Progress',
-            date: createdAt, // 👈 DateTime
-            time: DateFormat('HH:mm').format(createdAt), // 👈 giờ
+            date: createdAt,
+            time: DateFormat('HH:mm').format(createdAt),
             status: json['status'],
             participants: List<String>.from(
-              json['participants'] ?? ['A', 'B', 'C'], // 👈 mock nếu chưa có
+              json['participants'] ?? ['A', 'B', 'C'],
             ),
+            tags: List<String>.from(json['tags'] ?? []),
           );
         }).toList();
       } else {

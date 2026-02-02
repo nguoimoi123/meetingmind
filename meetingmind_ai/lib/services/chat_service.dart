@@ -1,22 +1,22 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/api_config.dart';
 
 class ChatService {
-  static final String? BASE_URL = dotenv.env['API_BASE_URL'];
-
   static Future<String> ask({
     required String userId,
     required String folderId,
     required String question,
+    List<String>? fileIds,
   }) async {
     final res = await http.post(
-      Uri.parse('$BASE_URL/chat/notebook'),
+      Uri.parse('$apiBaseUrl/chat/notebook'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'user_id': userId,
         'folder_id': folderId,
         'question': question,
+        if (fileIds != null && fileIds.isNotEmpty) 'file_ids': fileIds,
       }),
     );
 

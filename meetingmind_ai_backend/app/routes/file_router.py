@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from app.services.file_service import FileController
 
 file_bp = Blueprint("file", __name__, url_prefix="/file")
@@ -28,3 +28,17 @@ def get_files_by_folder(folder_id):
 def delete_file(file_id):
     response, status = FileController.delete_file(file_id)
     return jsonify(response), status
+
+
+@file_bp.route("/download/<file_id>", methods=["GET"])
+def download_file(file_id):
+    buffer, filename, mimetype, error, status = FileController.get_file_for_download(file_id)
+    if status != 200:
+        return jsonify(error), status
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype=mimetype,
+    )

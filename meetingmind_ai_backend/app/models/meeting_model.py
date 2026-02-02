@@ -17,6 +17,10 @@ class Meeting(db.Document):
     
     # Nội dung
     full_transcript = db.StringField() # Lưu toàn bộ văn bản
+    speaker_names = db.DictField(default=dict)  # Map speakerId -> display name
+
+    # Tags/labels
+    tags = db.ListField(db.StringField(), default=list)
     
     # Kết quả AI
     summary = db.StringField()
@@ -28,6 +32,17 @@ class Meeting(db.Document):
         'indexes': [
             'user_id',
             'created_at',
+            'tags',
+            {
+                'fields': [
+                    '$title',
+                    '$summary',
+                    '$full_transcript',
+                    '$action_items',
+                    '$key_decisions',
+                ],
+                'default_language': 'none',
+            },
         ]
     }
 
@@ -37,7 +52,9 @@ class Meeting(db.Document):
             "title": self.title,
             "status": self.status,
             "created_at": self.created_at.isoformat(),
+            "participants": list(self.speaker_names.values()) if self.speaker_names else [],
             "summary": self.summary,
             "action_items": self.action_items,
-            "key_decisions": self.key_decisions
+            "key_decisions": self.key_decisions,
+            "tags": self.tags or [],
         }

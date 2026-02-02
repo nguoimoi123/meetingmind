@@ -3,6 +3,7 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 from ..models.chunk_model import Chunk
+from ..services.usage_service import check_and_increment_qa
 
 load_dotenv()
 
@@ -24,18 +25,27 @@ def get_embedding(text):
     return res.data[0].embedding
 class ChatNotebookController:
     @staticmethod
-    def chat_bot_notebook(user_id, folder_id, question, top_k=5):
+    def chat_bot_notebook(user_id, folder_id, question, file_ids=None, top_k=5):
         if not all([user_id, folder_id, question]):
             return {"error": "Missing required fields"}, 400
+
+        allowed, error = check_and_increment_qa(user_id)
+        if not allowed:
+            return {"error": error or "Q&A limit reached"}, 403
         
         # Embedding câu hỏi
         question_embedding = get_embedding(question)
 
         # Lấy chunk trong folder
-        chunks = Chunk.objects(
+        query = Chunk.objects(
             user_id=user_id,
             folder_id=folder_id
         )
+
+        if isinstance(file_ids, list) and len(file_ids) > 0:
+            query = query.filter(file_id__in=file_ids)
+
+        chunks = query
         
         # Tính similarity
         scored_chunks = []

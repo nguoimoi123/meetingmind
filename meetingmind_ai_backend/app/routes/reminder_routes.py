@@ -35,6 +35,7 @@ def create_reminder():
 def get_reminder_by_day():
     user_id = request.args.get('user_id')
     date_str = request.args.get('date')
+    tz_offset = request.args.get('tz_offset')
 
     if not user_id or not date_str:
         return {"error": "user_id and date are required"}, 400
@@ -44,7 +45,12 @@ def get_reminder_by_day():
     except ValueError:
         return {"error": "Invalid date format (YYYY-MM-DD)"}, 400
 
-    return ReminderController.get_by_day(user_id, date)
+    try:
+        offset_minutes = int(tz_offset) if tz_offset is not None else None
+    except Exception:
+        offset_minutes = None
+
+    return ReminderController.get_by_day(user_id, date, offset_minutes)
 
 @reminder_bp.route('/delete/<reminder_id>', methods=['DELETE'])
 def delete_reminder(reminder_id):

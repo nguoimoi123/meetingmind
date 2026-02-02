@@ -13,6 +13,17 @@ class File(db.Document):
 
     size = db.IntField(required=True)
 
+    content = db.StringField()
+
     uploaded_at = db.DateTimeField(default=datetime.utcnow)
     
-    meta = {'collection': 'Files'}
+    meta = {
+        'collection': 'Files',
+        'indexes': [
+            'user_id',
+            {
+                'fields': ['$filename', '$content'],
+                'default_language': 'none',
+            },
+        ],
+    }

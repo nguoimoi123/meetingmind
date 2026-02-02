@@ -9,18 +9,23 @@ import 'package:meetingmind_ai/services/file_service.dart';
 import 'package:meetingmind_ai/services/chat_service.dart';
 import 'package:provider/provider.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:meetingmind_ai/config/plan_limits.dart';
+import 'package:meetingmind_ai/widgets/upgrade_dialog.dart';
+import 'package:meetingmind_ai/services/usage_service.dart';
 
 class FileItem {
   String id;
   String name;
   int size;
   String uploadDate;
+  String fileType;
 
   FileItem({
     required this.id,
     required this.name,
     required this.size,
     required this.uploadDate,
+    required this.fileType,
   });
 
   factory FileItem.fromJson(Map<String, dynamic> json) {
@@ -29,6 +34,7 @@ class FileItem {
       name: json['filename'],
       size: json['size'],
       uploadDate: json['uploaded_at'],
+      fileType: json['file_type'] ?? 'txt',
     );
   }
 }
@@ -190,12 +196,16 @@ class _SourcesTabState extends State<SourcesTab> {
   bool _isUploading = false;
   List<FileItem> _files = [];
   late String _userId;
+  String _plan = 'free';
+  Map<String, dynamic> _limits = {};
 
   @override
   void initState() {
     super.initState();
     final auth = Provider.of<AuthProvider>(context, listen: false);
     _userId = auth.userId!;
+    _plan = auth.plan;
+    _limits = auth.limits;
     _fetchFiles();
   }
 
@@ -247,6 +257,18 @@ class _SourcesTabState extends State<SourcesTab> {
   }
 
   Future<void> _pickAndUploadFile() async {
+    final limit = PlanLimits.filesPerFolderLimitFromLimits(_limits) ??
+        PlanLimits.filesPerFolderLimit(_plan);
+    if (limit != null && _files.length >= limit) {
+      if (mounted) {
+        await showUpgradeDialog(
+          context,
+          message: 'File limit reached for $_plan plan. Please upgrade.',
+        );
+      }
+      return;
+    }
+
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['docx', 'txt', 'md'],
@@ -318,6 +340,44 @@ class _SourcesTabState extends State<SourcesTab> {
     }
   }
 
+  Future<void> _downloadFile(FileItem file) async {
+    try {
+      final bytes = await FileService.downloadFile(file.id);
+      final isMobile = Platform.isAndroid || Platform.isIOS;
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Lưu file',
+        fileName: file.name,
+        allowedExtensions: [file.fileType],
+        bytes: isMobile ? bytes : null,
+      );
+
+      if (savePath != null && !isMobile) {
+        final outFile = File(savePath);
+        await outFile.writeAsBytes(bytes, flush: true);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              savePath != null ? 'Đã tải về: $savePath' : 'Đã lưu file',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Tải file thất bại: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Future<bool> showDeleteConfirm(FileItem file) async {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -373,8 +433,21 @@ class _SourcesTabState extends State<SourcesTab> {
       ThemeData theme, ColorScheme colorScheme, FileItem file) {
     return Dismissible(
       key: Key(file.id),
-      direction: DismissDirection.endToStart,
+      direction: DismissDirection.horizontal,
       background: Container(
+        alignment: Alignment.centerLeft,
+        padding: const EdgeInsets.only(left: 20),
+        decoration: BoxDecoration(
+          color: Colors.green.shade500,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Icon(
+          Icons.download_rounded,
+          color: Colors.white,
+          size: 28,
+        ),
+      ),
+      secondaryBackground: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
@@ -388,10 +461,16 @@ class _SourcesTabState extends State<SourcesTab> {
         ),
       ),
       confirmDismiss: (direction) async {
+        if (direction == DismissDirection.startToEnd) {
+          await _downloadFile(file);
+          return false;
+        }
         return await showDeleteConfirm(file);
       },
       onDismissed: (direction) {
-        deleteFile(file.id);
+        if (direction == DismissDirection.endToStart) {
+          deleteFile(file.id);
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(16.0),
@@ -452,13 +531,19 @@ class _SourcesTabState extends State<SourcesTab> {
   }
 
   Widget _buildUploadCard(ThemeData theme, ColorScheme colorScheme) {
+    final limit = PlanLimits.filesPerFolderLimitFromLimits(_limits) ??
+        PlanLimits.filesPerFolderLimit(_plan);
+    final canUpload = limit == null || _files.length < limit;
+
     return InkWell(
-      onTap: _isUploading ? null : _pickAndUploadFile,
+      onTap: _isUploading || !canUpload ? null : _pickAndUploadFile,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         height: 64,
         decoration: BoxDecoration(
-          color: colorScheme.surface,
+          color: canUpload
+              ? colorScheme.surface
+              : colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: colorScheme.outline.withOpacity(0.3),
@@ -481,7 +566,9 @@ class _SourcesTabState extends State<SourcesTab> {
                         color: colorScheme.primary, size: 22),
                     const SizedBox(width: 10),
                     Text(
-                      'Add New Document',
+                      canUpload
+                          ? 'Add New Document'
+                          : 'Limit reached for $_plan',
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: colorScheme.primary,
                         fontWeight: FontWeight.bold,
@@ -510,6 +597,52 @@ class _AskAITabState extends State<AskAITab> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+  bool _isLoadingFiles = true;
+  bool _isLoadingUsage = true;
+  List<FileItem> _files = [];
+  final Set<String> _selectedFileIds = {};
+  String _plan = 'free';
+  String _userId = '';
+  Map<String, dynamic> _limits = {};
+  int? _qaRemaining;
+
+  @override
+  void initState() {
+    super.initState();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    _plan = auth.plan;
+    _userId = auth.userId ?? '';
+    _limits = auth.limits;
+    _fetchFiles();
+    _fetchUsage();
+  }
+
+  Future<void> _fetchUsage() async {
+    if (_userId.isEmpty) return;
+    setState(() => _isLoadingUsage = true);
+    try {
+      final usage = await UsageService.getUsage(userId: _userId);
+      if (mounted) {
+        setState(() {
+          _qaRemaining = usage['qa_remaining'] as int?;
+          _isLoadingUsage = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingUsage = false);
+    }
+  }
+
+  Future<void> _fetchFiles() async {
+    final data = await FileService.getFolder(widget.folderId);
+    final List list = data['files'] ?? [];
+    if (mounted) {
+      setState(() {
+        _files = list.map((e) => FileItem.fromJson(e)).toList();
+        _isLoadingFiles = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -521,6 +654,20 @@ class _AskAITabState extends State<AskAITab> {
   Future<void> _sendMessage(dynamic auth) async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
+
+    final limit =
+        PlanLimits.qaLimitFromLimits(_limits) ?? PlanLimits.qaLimit(_plan);
+    if (limit != null && _qaRemaining != null) {
+      if (_qaRemaining! <= 0) {
+        if (mounted) {
+          await showUpgradeDialog(
+            context,
+            message: 'Q&A limit reached for $_plan plan. Please upgrade.',
+          );
+        }
+        return;
+      }
+    }
 
     setState(() {
       _messages.add(ChatMessage(text: text, isUser: true));
@@ -535,6 +682,7 @@ class _AskAITabState extends State<AskAITab> {
         folderId: widget.folderId,
         question: text,
         userId: auth.userId!,
+        fileIds: _selectedFileIds.isEmpty ? null : _selectedFileIds.toList(),
       );
 
       if (mounted) {
@@ -543,6 +691,7 @@ class _AskAITabState extends State<AskAITab> {
           _isLoading = false;
         });
       }
+      await _fetchUsage();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -550,6 +699,7 @@ class _AskAITabState extends State<AskAITab> {
           _isLoading = false;
         });
       }
+      await _fetchUsage();
     }
     _scrollToBottom();
   }
@@ -573,6 +723,58 @@ class _AskAITabState extends State<AskAITab> {
 
     return Column(
       children: [
+        if (_isLoadingUsage)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text('Loading usage...', style: theme.textTheme.bodySmall),
+              ],
+            ),
+          )
+        else if (_qaRemaining != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Q&A remaining: $_qaRemaining',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        if (_isLoadingFiles)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text('Đang tải danh sách file...',
+                    style: theme.textTheme.bodySmall),
+              ],
+            ),
+          )
+        else
+          _buildFileSelector(theme, colorScheme),
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
@@ -600,6 +802,71 @@ class _AskAITabState extends State<AskAITab> {
         ),
         _buildInputArea(theme, colorScheme),
       ],
+    );
+  }
+
+  Widget _buildFileSelector(ThemeData theme, ColorScheme colorScheme) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outline.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Chọn file để hỏi AI',
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilterChip(
+                label: const Text('Tất cả'),
+                selected: _selectedFileIds.isEmpty,
+                onSelected: (_) {
+                  setState(() => _selectedFileIds.clear());
+                },
+                selectedColor: colorScheme.primary.withOpacity(0.15),
+              ),
+              ..._files.map((file) {
+                final selected = _selectedFileIds.contains(file.id);
+                return FilterChip(
+                  label: Text(file.name,
+                      overflow: TextOverflow.ellipsis, maxLines: 1),
+                  selected: selected,
+                  onSelected: (value) {
+                    setState(() {
+                      if (value) {
+                        _selectedFileIds.add(file.id);
+                      } else {
+                        _selectedFileIds.remove(file.id);
+                      }
+                    });
+                  },
+                  selectedColor: colorScheme.primary.withOpacity(0.15),
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
     );
   }
 

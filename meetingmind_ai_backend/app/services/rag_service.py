@@ -55,7 +55,7 @@ def ingest_meeting_transcript(sid, user_id, full_transcript):
     except Exception as e:
         print(f"[RAG] Error ingesting meeting: {e}")
 
-def retrieve_relevant_chunks(user_id, query, top_k=3):
+def retrieve_relevant_chunks(user_id, query, top_k=3, folder_id=None, file_id=None, max_candidates=200):
     """
     Tìm các đoạn văn bản (chunks) liên quan nhất đến câu hỏi của user.
     Hiện tại search trên toàn bộ chunks của user (gồm cả meeting và notebook).
@@ -73,12 +73,19 @@ def retrieve_relevant_chunks(user_id, query, top_k=3):
 
     # 2. Lấy tất cả chunks của user (nếu data ít)
     # Nếu data nhiều, bạn nên dùng Vector Database như Pinecone/Qdrant thay vì tính toán tay
-    all_chunks = Chunk.objects(user_id=user_id).all()
+    query_set = Chunk.objects(user_id=user_id)
+    if folder_id:
+        query_set = query_set.filter(folder_id=folder_id)
+    if file_id:
+        query_set = query_set.filter(file_id=file_id)
+
+    all_chunks = query_set.limit(max_candidates)
     
     scored_chunks = []
     
     for chunk in all_chunks:
-        if not chunk.embedding: continue
+        if not chunk.embedding:
+            continue
         
         # Tính Cosine Similarity
         vec_a = np.array(query_vector)

@@ -1,15 +1,13 @@
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:typed_data';
+import '../config/api_config.dart';
 
 class FileService {
-  // ignore: constant_identifier_names
-  static final String? BASE_URL = dotenv.env['API_BASE_URL'];
-
   /// Lấy folder + danh sách file
   static Future<Map<String, dynamic>> getFolder(String folderId) async {
-    final res = await http.get(Uri.parse('$BASE_URL/file/folder/$folderId'));
+    final res = await http.get(Uri.parse('$apiBaseUrl/file/folder/$folderId'));
     if (res.statusCode == 200) {
       return json.decode(res.body);
     } else {
@@ -25,7 +23,7 @@ class FileService {
     required String content,
   }) async {
     final res = await http.post(
-      Uri.parse('$BASE_URL/file/upload'),
+      Uri.parse('$apiBaseUrl/file/upload'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
         'user_id': userId,
@@ -45,11 +43,18 @@ class FileService {
     }
   }
 
-  /// Xoá file
   static Future<void> deleteFile(String fileId) async {
-    final res = await http.delete(Uri.parse('$BASE_URL/file/delete/$fileId'));
+    final res = await http.delete(Uri.parse('$apiBaseUrl/file/delete/$fileId'));
     if (res.statusCode != 200) {
       throw Exception('Delete failed');
     }
+  }
+
+  static Future<Uint8List> downloadFile(String fileId) async {
+    final res = await http.get(Uri.parse('$apiBaseUrl/file/download/$fileId'));
+    if (res.statusCode != 200) {
+      throw Exception('Download failed');
+    }
+    return res.bodyBytes;
   }
 }

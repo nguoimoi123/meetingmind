@@ -1,15 +1,14 @@
 import 'dart:convert';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/api_config.dart';
 
 class GoogleAuthService {
   // 🔴 PHẢI TRÙNG GOOGLE_CLIENT_ID BACKEND
   static const String _webClientId =
       "828381156455-k2cht1g24gd4mv8nva7d19r5gh4hje85.apps.googleusercontent.com";
 
-  static final String _backendUrl =
-      dotenv.env['API_BASE_URL']! + "/auth/google";
+  static const String _backendUrl = googleAuthEndpoint;
   // Android emulator → 10.0.2.2
   // iOS simulator → http://localhost:5000
 
@@ -33,7 +32,7 @@ class GoogleAuthService {
   }
 
   /// Step 2: Gửi ID TOKEN lên backend
-  Future<String?> sendTokenToBackend(String idToken) async {
+  Future<Map<String, dynamic>?> sendTokenToBackend(String idToken) async {
     try {
       final response = await http.post(
         Uri.parse(_backendUrl),
@@ -43,7 +42,7 @@ class GoogleAuthService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return data['user_id']; // backend phải trả field này
+        return data as Map<String, dynamic>;
       }
       return null;
     } catch (e) {

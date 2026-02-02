@@ -149,13 +149,13 @@ class _SplashScreenState extends State<SplashScreen>
                 const Spacer(),
 
                 // --- INDICATOR TẢI (LOADING DOTS) ---
-                FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: const Padding(
-                    padding: EdgeInsets.only(bottom: 40.0),
-                    child: _DotLoader(), // Widget loader tùy chỉnh bên dưới
-                  ),
-                ),
+                // FadeTransition(
+                //   opacity: _fadeAnimation,
+                //   child: const Padding(
+                //     padding: EdgeInsets.only(bottom: 40.0),
+                //     child: _DotLoader(), // Widget loader tùy chỉnh bên dưới
+                //   ),
+                // ),
               ],
             ),
           ),

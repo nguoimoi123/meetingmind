@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/api_config.dart';
 
 class NotebookListService {
-  static final String? _baseUrl = dotenv.env['API_BASE_URL'];
   static Future<List<dynamic>> fetchFolders(String userId) async {
-    final baseUrl = _baseUrl;
+    const baseUrl = apiBaseUrl;
 
     final response = await http.get(
       Uri.parse('$baseUrl/folder/$userId'),
@@ -19,7 +18,7 @@ class NotebookListService {
   }
 
   static Future<void> deleteFolder(String folderId) async {
-    final baseUrl = _baseUrl;
+    final baseUrl = apiBaseUrl;
 
     final response = await http.delete(
       Uri.parse('$baseUrl/folder/delete/$folderId'),

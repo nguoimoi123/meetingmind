@@ -21,7 +21,7 @@ def chat_with_meeting():
         return jsonify({"error": "Missing query or sid"}), 400
 
     # 1. Thử tìm kiếm thông tin từ RAG (CSDL Vector)
-    relevant_chunks = retrieve_relevant_chunks(user_id, query, top_k=3)
+    relevant_chunks = retrieve_relevant_chunks(user_id, query, top_k=3, folder_id=sid)
     
     context_text = ""
     source_type = "RAG" # Để debug xem nguồn nào đang trả lời

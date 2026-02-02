@@ -7,7 +7,18 @@ import 'package:meetingmind_ai/services/notification_service.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
 
 class NewTaskScreen extends StatefulWidget {
-  const NewTaskScreen({super.key});
+  final String? initialTitle;
+  final String? initialLocation;
+  final DateTime? initialStartTime;
+  final DateTime? initialEndTime;
+
+  const NewTaskScreen({
+    super.key,
+    this.initialTitle,
+    this.initialLocation,
+    this.initialStartTime,
+    this.initialEndTime,
+  });
 
   @override
   State<NewTaskScreen> createState() => _NewTaskScreenState();
@@ -32,6 +43,13 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
   @override
   void initState() {
     super.initState();
+    _titleController.text = widget.initialTitle?.trim() ?? '';
+    _locationController.text = widget.initialLocation?.trim() ?? '';
+    _startTime = widget.initialStartTime;
+    _endTime = widget.initialEndTime;
+    if (_startTime != null && _endTime == null) {
+      _endTime = _startTime!.add(const Duration(hours: 1));
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userProvider = context.read<AuthProvider>();
       if (userProvider.userId != null) {

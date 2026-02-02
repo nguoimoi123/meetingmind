@@ -8,6 +8,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 // --- IMPORT SERVICE THÔNG BÁO ---
 import 'services/notification_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Providers
 import 'providers/theme_provider.dart';
@@ -20,6 +21,7 @@ import 'theme/app_theme.dart';
 import 'screens/onboarding/splash_screen.dart';
 import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/auth/reset_password_screen.dart';
 import 'screens/auth/reset_confirmation_screen.dart';
 
@@ -33,10 +35,14 @@ import 'screens/schedule/schedule_tasks_screen.dart';
 
 import 'screens/meeting/in_meeting_screen.dart';
 import 'screens/meeting/post_meeting_summary_screen.dart';
+import 'screens/meeting/meeting_setup_screen.dart';
 import 'screens/notebook/notebook_detail_screen.dart';
 
 import 'screens/notebook/create_notebook_screen.dart';
 import 'screens/schedule/new_task_screen.dart';
+import 'screens/search/search_screen.dart';
+import 'screens/team/team_screen.dart';
+import 'screens/team/team_detail_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
@@ -83,8 +89,11 @@ class MyApp extends StatelessWidget {
       redirect: (context, state) {
         final bool loggedIn = auth.isLoggedIn;
         final bool goingToAuth = state.uri.path.startsWith('/login') ||
+            state.uri.path.startsWith('/register') ||
             state.uri.path == '/onboarding' ||
-            state.uri.path == '/splash';
+            state.uri.path == '/splash' ||
+            state.uri.path == '/reset_password' ||
+            state.uri.path == '/reset_confirmation';
 
         // Chưa login → chỉ cho vào splash, onboarding, login
         if (!loggedIn && !goingToAuth) {
@@ -114,6 +123,11 @@ class MyApp extends StatelessWidget {
         GoRoute(
           path: '/login',
           builder: (_, __) => const LoginScreen(),
+        ),
+
+        GoRoute(
+          path: '/register',
+          builder: (_, __) => const RegisterScreen(),
         ),
 
         GoRoute(
@@ -150,6 +164,21 @@ class MyApp extends StatelessWidget {
               path: '/app/profile',
               builder: (_, __) => const ProfileScreen(),
             ),
+            GoRoute(
+              path: '/app/search',
+              builder: (_, __) => const SearchScreen(),
+            ),
+            GoRoute(
+              path: '/app/teams',
+              builder: (_, __) => const TeamScreen(),
+            ),
+            GoRoute(
+              path: '/app/team/:teamId',
+              builder: (context, state) {
+                final teamId = state.pathParameters['teamId']!;
+                return TeamDetailScreen(teamId: teamId);
+              },
+            ),
             // Route tạo Notebook (đã có sẵn)
             GoRoute(
               path: '/create_notebook',
@@ -158,7 +187,25 @@ class MyApp extends StatelessWidget {
             // <--- ROUTE TẠO TASK MỚI ---
             GoRoute(
               path: '/app/new_task',
-              builder: (context, state) => const NewTaskScreen(),
+              builder: (context, state) {
+                final extra = state.extra;
+                String? title;
+                String? location;
+                DateTime? startTime;
+                DateTime? endTime;
+                if (extra is Map<String, dynamic>) {
+                  title = extra['title'] as String?;
+                  location = extra['location'] as String?;
+                  startTime = extra['startTime'] as DateTime?;
+                  endTime = extra['endTime'] as DateTime?;
+                }
+                return NewTaskScreen(
+                  initialTitle: title,
+                  initialLocation: location,
+                  initialStartTime: startTime,
+                  initialEndTime: endTime,
+                );
+              },
             ),
             // ---------------------------------
           ],
@@ -166,8 +213,31 @@ class MyApp extends StatelessWidget {
 
         /// OTHER ROUTES OUTSIDE SHELL
         GoRoute(
+          path: '/meeting_setup',
+          builder: (_, __) => const MeetingSetupScreen(),
+        ),
+
+        GoRoute(
           path: '/in_meeting',
-          builder: (_, __) => const InMeetingScreen(),
+          builder: (context, state) {
+            final extra = state.extra;
+            String? title;
+            String? filePath;
+            bool aiAgentEnabled = false;
+            String? openAiKey;
+            if (extra is Map<String, dynamic>) {
+              title = extra['title'] as String?;
+              filePath = extra['filePath'] as String?;
+              aiAgentEnabled = (extra['aiAgentEnabled'] as bool?) ?? false;
+              openAiKey = extra['openAiKey'] as String?;
+            }
+            return InMeetingScreen(
+              title: title,
+              contextFilePath: filePath,
+              aiAgentEnabled: aiAgentEnabled,
+              openAiKey: openAiKey,
+            );
+          },
         ),
 
         GoRoute(
@@ -188,6 +258,19 @@ class MyApp extends StatelessWidget {
         ),
       ],
     );
+
+    NotificationService().setOnNotificationTap((payload) async {
+      if (payload == null) return;
+      if (payload.startsWith('team_invite:')) {
+        final teamId = payload.split(':').last;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pending_team_invite', teamId);
+        router.go('/app/teams');
+      } else if (payload.startsWith('team_event:')) {
+        final teamId = payload.split(':').last;
+        router.go('/app/team/$teamId');
+      }
+    });
 
     return Consumer<ThemeProvider>(
       builder: (_, themeProvider, __) {

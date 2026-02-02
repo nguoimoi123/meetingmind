@@ -1,6 +1,9 @@
+from io import BytesIO
+from docx import Document
 from ..models.file_model import File
 from ..models.folder_model import Folder
 from ..models.chunk_model import Chunk
+from ..services.plan_service import get_plan_limits, get_user_plan
 
 from openai import OpenAI
 import os
@@ -47,13 +50,26 @@ class FileController:
         if not all([user_id, folder_id, filename, file_type, size, content]):
             return {"error": "All file details are required"}, 400
 
+        plan = get_user_plan(user_id)
+        limits = get_plan_limits(plan)
+        files_limit = limits.get("files_per_folder_limit")
+        if files_limit is not None:
+            current_count = File.objects(folder_id=folder_id).count()
+            if current_count >= files_limit:
+                return {
+                    "error": "File limit reached for current plan",
+                    "plan": plan,
+                    "limit": files_limit,
+                }, 403
+
         # Tạo File object
         file = File(
             user_id=user_id,
             folder_id=folder_id,
             filename=filename,
             file_type=file_type,
-            size=size
+            size=size,
+            content=content
         )
         file.save()
 
@@ -113,4 +129,30 @@ class FileController:
         # Xoá file
         file.delete()
         return {"message": "File deleted successfully"}, 200
+
+    @staticmethod
+    def get_file_for_download(file_id):
+        file = File.objects(id=file_id).first()
+        if not file:
+            return None, None, None, {"error": "File not found"}, 404
+
+        content = file.content or ""
+        if not content:
+            chunks = Chunk.objects(file_id=str(file.id)).order_by('chunk_index')
+            content = "\n".join([c.text for c in chunks])
+
+        if file.file_type.lower() == "docx":
+            doc = Document()
+            doc.add_heading(file.filename, level=1)
+            if content.strip():
+                doc.add_paragraph(content)
+            buffer = BytesIO()
+            doc.save(buffer)
+            buffer.seek(0)
+            return buffer, file.filename, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", None, 200
+
+        text_bytes = content.encode("utf-8")
+        buffer = BytesIO(text_bytes)
+        buffer.seek(0)
+        return buffer, file.filename, "text/plain", None, 200
     

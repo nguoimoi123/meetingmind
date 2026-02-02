@@ -20,7 +20,6 @@ def add_folder():
 def get_folders(user_id):
     response, status = FolderController.get_folders_by_user(user_id)
     return jsonify(response), status
-
 @folder_bp.route("/delete/<folder_id>", methods=["DELETE"])
 def delete_folder(folder_id):
     response, status = FolderController.delete_folder(folder_id)

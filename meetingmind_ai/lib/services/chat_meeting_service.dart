@@ -1,14 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/api_config.dart';
 
 class ChatService {
-  String? _baseUrl = dotenv.get('API_BASE_URL');
-
   final String _currentUserId = "user_123"; // User giả định
 
   Future<String> askAboutMeeting(String sid, String question) async {
-    final uri = Uri.parse('$_baseUrl/chat/meeting');
+    final uri = Uri.parse('$apiBaseUrl/chat/meeting');
 
     try {
       final response = await http

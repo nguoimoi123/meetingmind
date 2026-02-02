@@ -11,6 +11,7 @@ def chat_notebook():
         user_id=data.get("user_id"),
         folder_id=data.get("folder_id"),
         question=data.get("question"),
+        file_ids=data.get("file_ids"),
         top_k=data.get("top_k", 5)
     )
 

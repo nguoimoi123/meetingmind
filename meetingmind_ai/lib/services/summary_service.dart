@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/meeting_summary.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../config/api_config.dart';
 
 class SummaryService {
-  static final String? _baseUrl = dotenv.env['API_BASE_URL'];
+  static const String _baseUrl = apiBaseUrl;
 
   static Future<MeetingSummary> summarize(String sid) async {
     final uri = Uri.parse('$_baseUrl/summarize/$sid');
