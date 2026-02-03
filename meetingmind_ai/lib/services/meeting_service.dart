@@ -31,10 +31,12 @@ class MeetingService {
   Stream<String> get statusStream => _statusController.stream;
   bool get isRecording => _isRecording;
 
-  void connect() {
+  Future<void> connect() async {
     if (_socket != null && _socket!.connected) return;
 
     print("Connecting to $_serverUrl...");
+
+    final completer = Completer<void>();
 
     // Truyền user_id vào query params khi connect
     _socket = IO.io(_serverUrl, <String, dynamic>{
@@ -51,6 +53,9 @@ class MeetingService {
       print('Connected to Server');
       _statusController.add('Connected');
       _syncMeetingMeta();
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
     });
 
     _socket!.on('disconnect', (_) {
@@ -69,7 +74,12 @@ class MeetingService {
 
     _socket!.on('error', (error) {
       print('Socket Error: $error');
+      if (!completer.isCompleted) {
+        completer.completeError(error);
+      }
     });
+
+    await completer.future;
   }
 
   void disconnect() {

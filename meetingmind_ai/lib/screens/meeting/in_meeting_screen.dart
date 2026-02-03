@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
@@ -10,6 +11,8 @@ import 'package:meetingmind_ai/services/meeting_service.dart';
 import 'package:meetingmind_ai/models/meeting_models.dart';
 import 'package:meetingmind_ai/services/summary_service.dart';
 import 'package:meetingmind_ai/models/meeting_summary.dart';
+import 'package:http/http.dart' as http;
+import 'package:docx_to_text/docx_to_text.dart';
 
 class InMeetingScreen extends StatefulWidget {
   final String? title;
@@ -34,6 +37,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   late MeetingService _meetingService;
   String _meetingTitle = 'Live Meeting';
   String? _contextText;
+  String? _openAiKey;
   String _plan = 'free';
   Map<String, dynamic> _limits = {};
   bool get _aiEnabled =>
@@ -55,6 +59,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   bool _isAskingAi = false;
   bool _isSummarizing = false;
   Timer? _meetingLimitTimer;
+  bool _hasInitialized = false;
 
   // Animation cho hiệu ứng thu âm
   late AnimationController _pulseController;
@@ -86,10 +91,13 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_hasInitialized) return;
+    _hasInitialized = true;
     final auth = context.read<AuthProvider>();
     final userId = auth.userId!;
     _plan = auth.plan;
     _limits = auth.limits;
+    _openAiKey = widget.openAiKey?.trim();
     _meetingTitle = widget.title ?? _meetingTitle;
     _meetingService = MeetingService(userId);
     _connectAndStart();
@@ -102,8 +110,32 @@ class _InMeetingScreenState extends State<InMeetingScreen>
 
     if (widget.contextFilePath != null) {
       try {
+        final lowerPath = widget.contextFilePath!.toLowerCase();
+        final ext = lowerPath.contains('.') ? lowerPath.split('.').last : '';
+        if (ext.isNotEmpty && ext != 'txt' && ext != 'docx') {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('AI Agent hiện chỉ hỗ trợ file TXT hoặc DOCX.'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          _contextText = null;
+          _meetingService.setMeetingContext(
+            title: title,
+            context: null,
+          );
+          return;
+        }
         final file = File(widget.contextFilePath!);
-        final content = await file.readAsString();
+        String content;
+        if (ext == 'docx') {
+          final bytes = await file.readAsBytes();
+          content = docxToText(bytes);
+        } else {
+          content = await file.readAsString();
+        }
         if (mounted) {
           _contextText = content;
           _meetingService.setMeetingContext(
@@ -144,7 +176,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     // Đặt title/context trước khi connect để server nhận meta ngay khi kết nối
     await _readContextFile();
 
-    _meetingService.connect();
+    await _meetingService.connect();
     _meetingService.startStreaming(title: _meetingTitle);
 
     final limitMinutes = PlanLimits.meetingDurationMinutesFromLimits(_limits) ??
@@ -302,7 +334,57 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     );
   }
 
-  void _askAiFromText(String text) {
+  Future<String> _askOpenAi({
+    required String question,
+    required String context,
+  }) async {
+    final key = _openAiKey;
+    if (key == null || key.isEmpty) {
+      throw Exception('Missing OpenAI API key');
+    }
+
+    final uri = Uri.parse('https://api.openai.com/v1/chat/completions');
+    final systemPrompt =
+        'Bạn là trợ lý họp. Chỉ trả lời dựa trên CONTEXT. Nếu không có thông tin, hãy nói rõ là không tìm thấy.';
+    final userPrompt = 'CONTEXT:\n$context\n\nCÂU HỎI: $question';
+
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $key',
+      },
+      body: jsonEncode({
+        'model': 'gpt-4o-mini',
+        'messages': [
+          {'role': 'system', 'content': systemPrompt},
+          {'role': 'user', 'content': userPrompt},
+        ],
+        'temperature': 0.2,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('OpenAI error: ${response.statusCode} ${response.body}');
+    }
+
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final choices = data['choices'] as List<dynamic>?;
+    if (choices == null || choices.isEmpty) {
+      throw Exception('OpenAI returned empty choices');
+    }
+    final message = choices.first['message'] as Map<String, dynamic>?;
+    final content = message?['content']?.toString().trim();
+    if (content == null || content.isEmpty) {
+      throw Exception('OpenAI returned empty content');
+    }
+    return content;
+  }
+
+  Future<void> _askAiFromText(String text) async {
+    if (_isAskingAi) return;
+    setState(() => _isAskingAi = true);
+
     String answer;
     final combinedContext = [
       if (_contextText != null && _contextText!.trim().isNotEmpty)
@@ -310,7 +392,15 @@ class _InMeetingScreenState extends State<InMeetingScreen>
       _buildTranscriptContext(),
     ].where((c) => c.trim().isNotEmpty).join("\n\n");
 
-    if (combinedContext.trim().isEmpty) {
+    if (_aiEnabled && combinedContext.trim().isNotEmpty) {
+      try {
+        answer = await _askOpenAi(question: text, context: combinedContext);
+      } catch (e) {
+        final fallback = _answerFromContext(text, combinedContext);
+        answer = fallback ??
+            "Không thể gọi AI lúc này. Vui lòng thử lại hoặc kiểm tra API key.";
+      }
+    } else if (combinedContext.trim().isEmpty) {
       answer = _answerFreely(text);
     } else {
       final found = _answerFromContext(text, combinedContext);
@@ -324,10 +414,13 @@ class _InMeetingScreenState extends State<InMeetingScreen>
       isFinal: true,
     );
 
-    setState(() {
-      _messages.add(aiMsg);
-    });
+    if (mounted) {
+      setState(() {
+        _messages.add(aiMsg);
+      });
+    }
     _scrollToBottom();
+    if (mounted) setState(() => _isAskingAi = false);
   }
 
   bool _isSummaryTooShort(MeetingSummary summary) {
@@ -699,9 +792,9 @@ class _InMeetingScreenState extends State<InMeetingScreen>
 
     final bubbleWrapper = isQuestion
         ? InkWell(
-            onTap: () {
+            onTap: () async {
               if (_isAskingAi) return;
-              _askAiFromText(msg.text);
+              await _askAiFromText(msg.text);
             },
             borderRadius: BorderRadius.circular(24),
             child: bubble,
@@ -938,13 +1031,11 @@ class _InMeetingScreenState extends State<InMeetingScreen>
                     ElevatedButton(
                       onPressed: _isAskingAi
                           ? null
-                          : () {
+                          : () async {
                               final q = _chatController.text.trim();
                               if (q.isEmpty) return;
-                              setState(() => _isAskingAi = true);
                               _chatController.clear();
-                              _askAiFromText(q);
-                              setState(() => _isAskingAi = false);
+                              await _askAiFromText(q);
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: colorScheme.primary,
