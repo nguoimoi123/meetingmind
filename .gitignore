@@ -1,0 +1,89 @@
+# Python virtual environment
+venv/
+meetingmind_ai_backend/venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Flask
+instance/
+.webassets-cache
+
+# Environment variables
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+
+# iOS
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Pods/
+ios/.generated/
+ios/Flutter/App.framework
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+
+# Android
+android/.gradle/
+android/gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/local.properties
+android/.idea/
+android/app/google-services.json
+
+# macOS
+macos/Flutter/ephemeral/
+macos/Pods/
+
+# Windows
+windows/flutter/ephemeral/
+
+# Web
+web/firebase-config.js
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
