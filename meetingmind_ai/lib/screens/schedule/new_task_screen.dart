@@ -45,10 +45,14 @@ class _NewTaskScreenState extends State<NewTaskScreen> {
     super.initState();
     _titleController.text = widget.initialTitle?.trim() ?? '';
     _locationController.text = widget.initialLocation?.trim() ?? '';
-    _startTime = widget.initialStartTime;
-    _endTime = widget.initialEndTime;
+    if (widget.initialStartTime != null) {
+      _startTime = TimeOfDay.fromDateTime(widget.initialStartTime!);
+    }
+    if (widget.initialEndTime != null) {
+      _endTime = TimeOfDay.fromDateTime(widget.initialEndTime!);
+    }
     if (_startTime != null && _endTime == null) {
-      _endTime = _startTime!.add(const Duration(hours: 1));
+      _endTime = TimeOfDay(hour: (_startTime!.hour + 1) % 24, minute: _startTime!.minute);
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final userProvider = context.read<AuthProvider>();

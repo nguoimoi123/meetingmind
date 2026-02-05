@@ -75,20 +75,6 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     Color(0xFF00B0FF), // Xanh da trời
   ];
 
-  // Animation cho hiệu ứng thu âm
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  // Màu sắc rực rỡ cho speaker
-  static const List<Color> _speakerColors = [
-    Color(0xFF2962FF), // Xanh đậm
-    Color(0xFF6200EA), // Tím
-    Color(0xFF00C853), // Xanh lá
-    Color(0xFFFF6D00), // Cam
-    Color(0xFFD50000), // Đỏ
-    Color(0xFF00B0FF), // Xanh da trời
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -210,7 +196,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
       });
     }
 
-    _meetingService.transcriptStream.listen((message) {
+    _meetingService.transcriptStream.listen((TranscriptMessage message) {
       print("📥 Nhận: ${message.speaker}: ${message.text}");
       if (!message.isFinal) return;
 

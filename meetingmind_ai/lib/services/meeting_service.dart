@@ -4,6 +4,7 @@ import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../config/api_config.dart';
+import '../models/meeting_models.dart';
 
 class MeetingService {
   IO.Socket get socket => _socket!;

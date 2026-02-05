@@ -14,3 +14,7 @@ class Config:
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     SM_URL = "wss://eu.rt.speechmatics.com/v2"
     HEADER_LEN = 5
+
+    CLOUD_NAME = os.getenv("CLOUD_NAME")
+    API_KEY = os.getenv("API_KEY")
+    API_SECRET = os.getenv("API_SECRET")

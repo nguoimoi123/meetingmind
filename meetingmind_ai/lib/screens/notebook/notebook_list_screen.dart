@@ -14,7 +14,7 @@ class NotebookListScreen extends StatefulWidget {
 }
 
 class _NotebookListScreenState extends State<NotebookListScreen> {
-  // Danh sách màu sắc Google-esque cho icon (Blue, Red, Yellow, Green, Purple)
+  // Danh sách màu sắc được giữ nguyên từ mẫu Flutter (Google-esque)
   final List<Color> _notebookColors = [
     const Color(0xFF4285F4), // Google Blue
     const Color(0xFFEA4335), // Google Red
@@ -23,8 +23,6 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
     const Color(0xFFAA00FF), // Purple
     const Color(0xFF00ACC1), // Cyan
   ];
-
-  final NotebookListService _notebookListService = NotebookListService();
 
   List<dynamic> _folders = [];
   bool _isLoading = true;
@@ -111,6 +109,7 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
     }
   }
 
+  // Format ngày tháng đơn giản
   String _formatDate(String dateString) {
     try {
       final date = DateTime.parse(dateString);
@@ -132,10 +131,10 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
         folderLimit == null || _folders.length < folderLimit;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface, // Nền chính
+      backgroundColor: colorScheme.surface,
       body: CustomScrollView(
         slivers: [
-          // App Bar hiện đại, trong suốt
+          // App Bar giữ nguyên từ mẫu
           SliverAppBar(
             floating: true,
             backgroundColor: colorScheme.surface,
@@ -204,16 +203,15 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
           // List State
           if (!_isLoading && _errorMessage == null)
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                  16, 0, 16, 100), // Padding horizontal
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final folder = _folders[index];
-                    // Lấy màu dựa trên index để tạo sự đa dạng
                     final color =
                         _notebookColors[index % _notebookColors.length];
-                    return _buildNotebookCard(
+                    // Sử dụng Card được cập nhật theo phong cách React
+                    return _buildProjectCard(
                         context, folder, color, colorScheme);
                   },
                   childCount: _folders.length,
@@ -221,35 +219,57 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
               ),
             ),
 
-          // Empty State (Optional UI polish)
+          // Empty State (Được cập nhật nội dung theo React)
           if (!_isLoading && _errorMessage == null && _folders.isEmpty)
             SliverFillRemaining(
               child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.book_outlined,
-                        size: 64,
-                        color: colorScheme.onSurface.withOpacity(0.2)),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No notebooks yet',
-                      style: theme.textTheme.titleMedium
-                          ?.copyWith(color: colorScheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Create a new notebook to get started',
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: colorScheme.onSurfaceVariant),
-                    ),
-                  ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Icon hình tròn gradient mô phỏng React
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF4DD0E1), Color(0xFF2979FF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.create_new_folder_rounded,
+                          size: 48,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      Text(
+                        'Create Your First Project',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Organize documents by topic. Upload multiple sources per project and chat with them using AI.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
         ],
       ),
-      // Floating Action Button kiểu Google (dạng tròn hoặc có nhãn)
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 24.0, right: 16.0),
         child: FloatingActionButton.extended(
@@ -264,7 +284,7 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
             context.push('/create_notebook');
           },
           elevation: 4,
-          backgroundColor: Color(0xFF2962FF),
+          backgroundColor: const Color(0xFF2962FF), // Vibrant Blue
           icon: const Icon(Icons.add, color: Colors.white),
           label: const Text('New',
               style:
@@ -276,7 +296,8 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
     );
   }
 
-  Widget _buildNotebookCard(
+  // Widget Card được cập nhật để giống ProjectCard trong React
+  Widget _buildProjectCard(
     BuildContext context,
     Map<String, dynamic> folder,
     Color accentColor,
@@ -286,7 +307,10 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
 
     final String name = folder['name'] ?? 'Untitled';
     final String description = folder['description'] ?? 'No description added.';
-    final String createdAt = folder['created_at'] ?? '';
+    // Giả sử API trả về 'updated_at' hoặc dùng 'created_at' làm fallback
+    final String dateStr = folder['updated_at'] ?? folder['created_at'] ?? '';
+    // Giả sử API trả về 'source_count' hoặc tính từ mảng sources nếu có
+    final int sourceCount = folder['source_count'] ?? 0;
 
     return Dismissible(
       key: Key(folder['id']),
@@ -313,7 +337,7 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         child: Material(
-          color: colorScheme.surfaceContainerLow, // Màu nền xám rất nhạt
+          color: colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(16),
           elevation: 0,
           child: InkWell(
@@ -326,36 +350,35 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: colorScheme.outline.withOpacity(0.1), // Viền rất mờ
+                  color: colorScheme.outline.withOpacity(0.1),
                   width: 1,
                 ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Icon Notebook với màu sắc động
+                  // Icon màu sắc (Tương ứng color tag trong React)
                   Container(
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color:
-                          accentColor.withOpacity(0.1), // Nhấn màu nền icon nhẹ
+                      color: accentColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
-                      Icons.description_outlined, // Icon tài liệu
+                      Icons.description_outlined,
                       color: accentColor,
                       size: 24,
                     ),
                   ),
                   const SizedBox(width: 16),
 
-                  // Nội dung chính
+                  // Nội dung
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Tiêu đề
+                        // Title
                         Text(
                           name,
                           maxLines: 1,
@@ -368,7 +391,7 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
                         ),
                         const SizedBox(height: 4),
 
-                        // Mô tả
+                        // Description
                         Text(
                           description,
                           maxLines: 2,
@@ -381,23 +404,40 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Footer: Ngày tạo và dấu chấm trỏ
+                        // Footer: Sources count & Date (Giống layout React)
                         Row(
                           children: [
+                            // Source Count Icon
+                            Icon(
+                              Icons.attach_file_rounded,
+                              size: 13,
+                              color:
+                                  colorScheme.onSurfaceVariant.withOpacity(0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '$sourceCount sources',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant
+                                    .withOpacity(0.8),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            // Date Icon
                             Icon(
                               Icons.schedule_outlined,
                               size: 13,
                               color:
                                   colorScheme.onSurfaceVariant.withOpacity(0.7),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 4),
                             Text(
-                              'Created ${_formatDate(createdAt)}',
+                              _formatDate(dateStr),
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: colorScheme.onSurfaceVariant
                                     .withOpacity(0.8),
                                 fontWeight: FontWeight.w500,
-                                letterSpacing: 0.2,
                               ),
                             ),
                           ],
@@ -406,7 +446,7 @@ class _NotebookListScreenState extends State<NotebookListScreen> {
                     ),
                   ),
 
-                  // Icon mũi tên bên phải (tuỳ chọn, mang tính điều hướng)
+                  // Mũi tên điều hướng
                   Padding(
                     padding: const EdgeInsets.only(left: 8.0, top: 4.0),
                     child: Icon(

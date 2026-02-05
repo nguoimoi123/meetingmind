@@ -12,7 +12,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+meetingmind_ai_backend/lib/
 lib64/
 parts/
 sdist/

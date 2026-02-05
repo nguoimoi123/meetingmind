@@ -10,6 +10,11 @@ import 'package:meetingmind_ai/services/usage_service.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
+  @override
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen> {
   String _limitText(int? limit) => limit == null ? 'Unlimited' : '$limit';
 
   Future<Map<String, dynamic>?> _getUsage(String userId) async {
@@ -516,6 +521,7 @@ class ProfileScreen extends StatefulWidget {
               _buildSettingsTile(
                 context: context,
                 icon: Icons.lock_outline,
+                iconColor: Colors.redAccent,
                 title: 'Change Password',
                 onTap: () {
                   context.push('/reset_password');
@@ -524,6 +530,7 @@ class ProfileScreen extends StatefulWidget {
               _buildSettingsTile(
                 context: context,
                 icon: Icons.groups_rounded,
+                iconColor: Colors.blue,
                 title: 'Team Scheduling',
                 onTap: () {
                   context.push('/app/teams');
@@ -535,6 +542,7 @@ class ProfileScreen extends StatefulWidget {
                 context: context,
                 icon: Icons
                     .workspace_premium, // Icon hình viên kim cương/giấy chứng nhận
+                iconColor: Colors.amber,
                 title: 'Manage Subscription',
                 onTap: () {
                   if (userId == null || userId!.isEmpty) {
@@ -558,6 +566,7 @@ class ProfileScreen extends StatefulWidget {
                 context: context,
                 icon: Icons
                     .notifications_active_outlined, // Icon chuông có dấu active
+                iconColor: Colors.deepOrange,
                 title: 'Notifications',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -591,6 +600,7 @@ class ProfileScreen extends StatefulWidget {
               _buildSettingsTile(
                 context: context,
                 icon: Icons.translate, // Icon dịch thuật
+                iconColor: Colors.teal,
                 title: 'Language',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -604,6 +614,7 @@ class ProfileScreen extends StatefulWidget {
               _buildSettingsTile(
                 context: context,
                 icon: Icons.calendar_today_rounded, // Icon lịch bo tròn
+                iconColor: Colors.deepPurple,
                 title: 'Default Calendar',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -623,6 +634,7 @@ class ProfileScreen extends StatefulWidget {
               _buildSettingsTile(
                 context: context,
                 icon: Icons.help_center_rounded,
+                iconColor: Colors.blue,
                 title: 'FAQ & Help Center',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -636,6 +648,7 @@ class ProfileScreen extends StatefulWidget {
               _buildSettingsTile(
                 context: context,
                 icon: Icons.headset_mic_outlined,
+                iconColor: Colors.orange,
                 title: 'Contact Support',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -649,6 +662,7 @@ class ProfileScreen extends StatefulWidget {
               _buildSettingsTile(
                 context: context,
                 icon: Icons.verified_user_outlined,
+                iconColor: Colors.green,
                 title: 'Privacy Policy',
                 onTap: () {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -678,6 +692,7 @@ class ProfileScreen extends StatefulWidget {
                   side: BorderSide(color: theme.colorScheme.error),
                   foregroundColor: theme.colorScheme.error,
                 ),
+                child: const Text('Logout'),
               ),
             ),
           ],

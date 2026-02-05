@@ -395,56 +395,48 @@ class _DashboardScreenState extends State<DashboardScreen>
                         ),
                       ],
                     ),
-                    // Avatar
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color(0xFF2962FF),
-                          width: 2,
-                        ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 26,
-                        backgroundColor: colorScheme.surfaceContainerHighest,
-                        backgroundImage:
-                            const NetworkImage('https://i.pravatar.cc/150'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // --- RECENT MEETINGS ---
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-                    child: Text(
-                      'Recent Meetings',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
                   ),
+                  // Avatar
                   Container(
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
                       shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFF2962FF),
+                        width: 2,
+                      ),
                     ),
-                    child: IconButton(
-                      onPressed: () => context.push('/app/calendar'),
-                      icon: Icon(Icons.arrow_forward,
-                          color: colorScheme.onSurface),
+                    child: CircleAvatar(
+                      radius: 26,
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                      backgroundImage:
+                          const NetworkImage('https://i.pravatar.cc/150'),
                     ),
                   ),
                 ],
               ),
+            ),
+          ),
+
+          // --- RECENT MEETINGS ---
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 180,
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _recentMeetings.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 24),
+                          child: Text("No recent meetings found"))
+                      : ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          itemCount: _recentMeetings.length,
+                          itemBuilder: (context, index) {
+                            final meeting = _recentMeetings[index];
+                            return _buildMeetingCard(
+                                meeting, colorScheme, theme, dateFormat);
+                          },
+                        ),
             ),
           ),
 
@@ -557,57 +549,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     },
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2962FF),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF2962FF).withOpacity(0.3),
-                            blurRadius: 8,
-                          )
-                        ],
-                      ),
-                      child: const Icon(Icons.calendar_today,
-                          color: Colors.white, size: 24),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "Today's Schedule",
-                            style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "You have events coming up. Check details.",
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface.withOpacity(0.7)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        onPressed: () => context.push('/app/calendar'),
-                        icon: Icon(Icons.arrow_forward,
-                            color: colorScheme.onSurface),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                const SizedBox(height: 24),
+              ],
             ),
           ),
         ],
@@ -796,21 +739,6 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           ],
         ),
-      ),
-      // --- ANIMATED GRADIENT CIRCLE ---
-      floatingActionButton: AnimatedGradientFAB(
-        animationController: _animationController,
-        rotationAnimation: _rotationAnimation,
-        pulseAnimation: _pulseAnimation,
-        bottomPadding: bottomPadding,
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const VoiceSelectionScreen(),
-            ),
-          );
-        },
       ),
     );
   }

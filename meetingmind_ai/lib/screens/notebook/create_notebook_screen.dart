@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meetingmind_ai/services/create_notebook_service.dart';
@@ -22,16 +23,16 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
   final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _descriptionFocusNode = FocusNode();
 
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
+  late AnimationController _buttonAnimationController;
+  late Animation<double> _buttonScaleAnimation;
 
   bool _hasText = false;
   bool _isLoading = false;
   late String _userId;
 
-  // --- PALETTE MÀU SẮC ---
-  static const Color _vibrantBlue = Color(0xFF2962FF);
-  static const Color _softBlue = Color(0xFF448AFF);
+  // Palette màu sắc hiện đại
+  static const Color _primaryColor = Color(0xFF2962FF);
+  static const Color _bgColor = Color(0xFFF5F7FA);
 
   @override
   void initState() {
@@ -43,29 +44,24 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
       }
     });
 
-    // Animation cho dòng gạch dưới title
-    _animationController = AnimationController(
+    // Animation cho nút bấm khi có nội dung
+    _buttonAnimationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 200),
     );
-    _scaleAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    _buttonScaleAnimation = Tween<double>(begin: 0.95, end: 1.0).animate(
+      CurvedAnimation(parent: _buttonAnimationController, curve: Curves.easeOut),
     );
 
-    // Lắng nghe thay đổi text
     _titleController.addListener(() {
       final hasText = _titleController.text.trim().isNotEmpty;
       if (hasText != _hasText) {
         setState(() => _hasText = hasText);
-      }
-    });
-
-    // Lắng nghe Focus
-    _titleFocusNode.addListener(() {
-      if (_titleFocusNode.hasFocus) {
-        _animationController.forward();
-      } else {
-        _animationController.reverse();
+        if (hasText) {
+          _buttonAnimationController.forward();
+        } else {
+          _buttonAnimationController.reverse();
+        }
       }
     });
   }
@@ -76,7 +72,7 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
     _descriptionController.dispose();
     _titleFocusNode.dispose();
     _descriptionFocusNode.dispose();
-    _animationController.dispose();
+    _buttonAnimationController.dispose();
     super.dispose();
   }
 
@@ -90,6 +86,7 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
     final plan = auth.plan;
     final folderLimit = PlanLimits.folderLimitFromLimits(auth.limits) ??
         PlanLimits.folderLimit(plan);
+    
     if (folderLimit != null) {
       try {
         final folders = await NotebookListService.fetchFolders(_userId);
@@ -124,6 +121,7 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
             content: Text('Lỗi: $e'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -139,384 +137,304 @@ class _CreateNotebookScreenState extends State<CreateNotebookScreen>
     final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? colorScheme.surface : const Color(0xFFF0F2F5),
+      backgroundColor: isDark ? colorScheme.surface : _bgColor,
+      // App Bar trong suốt, gọn nhẹ
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white10 : Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                )
+              ],
+            ),
+            child: Icon(Icons.close_rounded, color: colorScheme.onSurface),
+          ),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(
+          'New Project',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
+        ),
+      ),
+      // Decor nền trang trí (Gradient Blob)
       body: Stack(
         children: [
-          Column(
-            children: [
-              // --- HEADER SECTION (Clean & Vibrant) ---
-              Expanded(
-                flex: 4,
-                child: Stack(
-                  children: [
-                    // Header Background
-                    Stack(
+          Positioned(
+            top: -100,
+            right: -50,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    _primaryColor.withOpacity(0.15),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -50,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    Colors.purple.withOpacity(0.1),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Nội dung chính
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header Intro
+                Text(
+                  'Create a new workspace',
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Organize your documents and start chatting with AI.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // Main Card Container
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: isDark ? colorScheme.surfaceContainerHighest : Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: double.infinity,
-                          height: double.infinity,
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [_vibrantBlue, _softBlue],
-                            ),
+                        // --- TITLE INPUT ---
+                        Text(
+                          'Project Name',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: _primaryColor,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
                           ),
                         ),
-                        // Subtle decoration circles
-                        Positioned(
-                          top: -50,
-                          right: -50,
-                          child: Container(
-                            width: 200,
-                            height: 200,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              shape: BoxShape.circle,
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _titleController,
+                          focusNode: _titleFocusNode,
+                          enabled: !_isLoading,
+                          textCapitalization: TextCapitalization.words,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: colorScheme.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'e.g. Q4 Marketing Plan',
+                            filled: true,
+                            fillColor: isDark ? colorScheme.surface : _bgColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                          ),
+                          validator: (value) => value!.trim().isEmpty
+                              ? 'Please enter a name'
+                              : null,
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // --- DESCRIPTION INPUT ---
+                        Text(
+                          'Description (Optional)',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: _primaryColor,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _descriptionController,
+                          focusNode: _descriptionFocusNode,
+                          enabled: !_isLoading,
+                          maxLines: 4,
+                          textCapitalization: TextCapitalization.sentences,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: colorScheme.onSurface,
+                            height: 1.5,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: 'Briefly describe this project...',
+                            filled: true,
+                            fillColor: isDark ? colorScheme.surface : _bgColor,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
                             ),
                           ),
                         ),
                       ],
                     ),
+                  ),
+                ),
 
-                    // Header Content
-                    SafeArea(
-                      bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 20),
-                            // Close Button (Glassmorphism)
-                            InkWell(
-                              onTap: () => context.pop(),
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Icon(
-                                  Icons.close_rounded,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                            const Spacer(),
-                            // Title & Icon
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(14),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.25),
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                  child: const Icon(
-                                    Icons.description_rounded,
-                                    color: Colors.white,
-                                    size: 36,
-                                  ),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Create',
-                                        style: theme.textTheme.titleLarge
-                                            ?.copyWith(
-                                          color: Colors.white70,
-                                          fontWeight: FontWeight.w500,
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                      Text(
-                                        'New Notebook',
-                                        style: theme.textTheme.headlineMedium
-                                            ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w900,
-                                          height: 1.1,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 40),
-                          ],
+                const SizedBox(height: 24),
+
+                // --- TIP BOX ---
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        _primaryColor.withOpacity(0.08),
+                        _primaryColor.withOpacity(0.02),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: _primaryColor.withOpacity(0.1),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: _primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.lightbulb_rounded,
+                          color: _primaryColor,
+                          size: 18,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // --- FORM CONTENT ---
-              Expanded(
-                flex: 6,
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: isDark ? colorScheme.surface : Colors.white,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(32),
-                      topRight: Radius.circular(32),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(isDark ? 0.4 : 0.05),
-                        blurRadius: 40,
-                        offset: const Offset(0, -10),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Pro Tip: Uploading related documents together improves AI accuracy significantly.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurface.withOpacity(0.8),
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(32),
-                      topRight: Radius.circular(32),
-                    ),
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.only(
-                        left: 24,
-                        right: 24,
-                        top: 40,
-                        bottom: MediaQuery.of(context).viewInsets.bottom + 120,
-                      ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // --- TITLE INPUT ---
-                            Text(
-                              'Notebook Name',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: _vibrantBlue,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              controller: _titleController,
-                              focusNode: _titleFocusNode,
-                              enabled: !_isLoading,
-                              textCapitalization: TextCapitalization.words,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: colorScheme.onSurface,
-                                fontWeight: FontWeight.w700,
-                                height: 1.2,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: 'Enter notebook name',
-                                hintStyle:
-                                    theme.textTheme.headlineSmall?.copyWith(
-                                  color: colorScheme.onSurface.withOpacity(0.2),
-                                  fontWeight: FontWeight.w400,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              validator: (value) => value!.trim().isEmpty
-                                  ? 'Please enter a name'
-                                  : null,
-                            ),
-                            // Animated Underline
-                            Padding(
-                              padding: const EdgeInsets.only(top: 10.0),
-                              child: AnimatedBuilder(
-                                animation: _scaleAnimation,
-                                builder: (context, child) {
-                                  return FractionallySizedBox(
-                                    widthFactor: _scaleAnimation.value,
-                                    alignment: Alignment.centerLeft,
-                                    child: Container(
-                                      height: 4,
-                                      decoration: BoxDecoration(
-                                        gradient: const LinearGradient(
-                                          colors: [_vibrantBlue, _softBlue],
-                                        ),
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-
-                            const SizedBox(height: 32),
-
-                            // --- DESCRIPTION INPUT (Modern Card Style) ---
-                            Text(
-                              'Description',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: _vibrantBlue,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? colorScheme.surfaceContainerHighest
-                                    : const Color(0xFFF5F7FA),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: _descriptionFocusNode.hasFocus
-                                      ? _vibrantBlue.withOpacity(0.5)
-                                      : Colors.transparent,
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  if (_descriptionFocusNode.hasFocus)
-                                    BoxShadow(
-                                      color: _vibrantBlue.withOpacity(0.1),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 5),
-                                    )
-                                ],
-                              ),
-                              child: TextFormField(
-                                controller: _descriptionController,
-                                focusNode: _descriptionFocusNode,
-                                enabled: !_isLoading,
-                                maxLines: 5,
-                                textCapitalization:
-                                    TextCapitalization.sentences,
-                                style: theme.textTheme.bodyLarge?.copyWith(
-                                  color: colorScheme.onSurface,
-                                  height: 1.5,
-                                ),
-                                decoration: InputDecoration(
-                                  hintText: 'What is this notebook about?',
-                                  hintStyle:
-                                      theme.textTheme.bodyMedium?.copyWith(
-                                    color:
-                                        colorScheme.onSurface.withOpacity(0.4),
-                                  ),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 20),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
-              ),
-            ],
-          ),
+                
+                const SizedBox(height: 32),
 
-          // --- FLOATING CREATE BUTTON ---
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              // Gradient fade để button hòa với form
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    isDark ? colorScheme.surface : Colors.white,
-                    isDark ? colorScheme.surface : Colors.white,
-                  ],
-                ),
-              ),
-              padding: EdgeInsets.only(
-                left: 24,
-                right: 24,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-                top: 10,
-              ),
-              child: SafeArea(
-                top: false,
-                child: SizedBox(
+                // --- CREATE BUTTON ---
+                SizedBox(
                   width: double.infinity,
-                  height: 64,
+                  height: 56,
                   child: _isLoading
                       ? Container(
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(32),
+                            borderRadius: BorderRadius.circular(28),
                           ),
-                          child: Center(
-                            child:
-                                CircularProgressIndicator(color: _vibrantBlue),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 3),
+                            ),
                           ),
                         )
-                      : InkWell(
-                          onTap: _hasText ? _submitForm : null,
-                          borderRadius: BorderRadius.circular(32),
-                          splashColor: Colors.white24,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            decoration: BoxDecoration(
-                              gradient: _hasText
-                                  ? const LinearGradient(
-                                      colors: [_vibrantBlue, _softBlue],
-                                    )
-                                  : null,
-                              color: _hasText
-                                  ? null
-                                  : (isDark
-                                      ? colorScheme.surfaceContainerHighest
-                                      : const Color(0xFFE0E0E0)),
-                              borderRadius: BorderRadius.circular(32),
-                              boxShadow: _hasText
-                                  ? [
-                                      BoxShadow(
-                                        color: _vibrantBlue.withOpacity(0.4),
-                                        blurRadius: 24,
-                                        offset: const Offset(0, 8),
-                                      )
-                                    ]
-                                  : [],
+                      : AnimatedScale(
+                          scale: _hasText ? 1.0 : 0.98,
+                          duration: const Duration(milliseconds: 200),
+                          child: ElevatedButton(
+                            onPressed: _hasText ? _submitForm : null,
+                            style: ElevatedButton.styleFrom(
+                              elevation: _hasText ? 2 : 0,
+                              backgroundColor: _hasText
+                                  ? _primaryColor
+                                  : colorScheme.surfaceContainerHighest,
+                              foregroundColor: _hasText
+                                  ? Colors.white
+                                  : colorScheme.onSurface.withOpacity(0.4),
+                              disabledBackgroundColor: colorScheme.surfaceContainerHighest,
+                              disabledForegroundColor: colorScheme.onSurface.withOpacity(0.4),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(28),
+                              ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(
-                                  'Create Notebook',
-                                  style: theme.textTheme.titleMedium?.copyWith(
+                                const Text(
+                                  'Create Project',
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: _hasText
-                                        ? Colors.white
-                                        : colorScheme.onSurface
-                                            .withOpacity(0.5),
+                                    fontSize: 16,
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Icon(
-                                  Icons.arrow_forward_rounded,
-                                  size: 20,
-                                  color: _hasText
-                                      ? Colors.white
-                                      : colorScheme.onSurface.withOpacity(0.5),
-                                ),
+                                const SizedBox(width: 8),
+                                Icon(Icons.arrow_forward_rounded, size: 20),
                               ],
                             ),
                           ),
                         ),
                 ),
-              ),
+
+                SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
+              ],
             ),
           ),
         ],

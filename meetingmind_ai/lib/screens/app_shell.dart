@@ -42,7 +42,7 @@ class AppShell extends StatelessWidget {
   int _getSelectedIndex(String location) {
     if (location.startsWith('/app/home')) return 0;
     if (location.startsWith('/app/meeting')) return 1;
-    if (location.startsWith('/app/notebooks')) return 2;
+    if (location.startsWith('/app/notebooks') || location.startsWith('/create_notebook') || location.startsWith('/notebook_detail')) return 2;
     if (location.startsWith('/app/calendar')) return 3;
     if (location.startsWith('/app/profile')) return 4;
     return 0;
