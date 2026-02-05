@@ -450,7 +450,14 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     }
 
     try {
-      final summary = await SummaryService.summarize(sid);
+      final userId = context.read<AuthProvider>().userId;
+      if (userId == null || userId.isEmpty) {
+        throw Exception('Bạn cần đăng nhập');
+      }
+      final summary = await SummaryService.summarize(
+        sid,
+        userId: userId,
+      );
 
       if (_isSummaryTooShort(summary)) {
         if (!mounted) return;

@@ -91,9 +91,12 @@ class MeetingService {
   void startStreaming({String? title}) {
     final payloadTitle = (title ?? meetingTitle)?.trim();
     if (payloadTitle != null && payloadTitle.isNotEmpty) {
-      _socket?.emit('start_streaming', {'title': payloadTitle});
+      _socket?.emit('start_streaming', {
+        'title': payloadTitle,
+        'user_id': userId,
+      });
     } else {
-      _socket?.emit('start_streaming');
+      _socket?.emit('start_streaming', {'user_id': userId});
     }
     _isRecording = true;
     _statusController.add('Recording started');

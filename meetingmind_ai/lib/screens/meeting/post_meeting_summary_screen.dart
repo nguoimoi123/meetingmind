@@ -47,7 +47,14 @@ class _PostMeetingSummaryScreenState extends State<PostMeetingSummaryScreen> {
   }
 
   Future<void> _load() async {
-    final result = await SummaryService.summarize(widget.meetingSid);
+    final userId = context.read<AuthProvider>().userId;
+    if (userId == null || userId.isEmpty) {
+      throw Exception('Bạn cần đăng nhập');
+    }
+    final result = await SummaryService.summarize(
+      widget.meetingSid,
+      userId: userId,
+    );
     setState(() => summary = result);
     await _loadMeetingMeta();
   }
