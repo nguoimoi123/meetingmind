@@ -3,22 +3,26 @@ import re
 from app.models.chunk_model import Chunk
 
 from ..models.meeting_model import Meeting
+from mongoengine.errors import NotUniqueError
 
 def get_or_create_meeting(sid, user_id, title=None):
     """
     Lấy cuộc họp nếu đã có, nếu chưa thì tạo mới.
     Được gọi ngay khi bắt đầu Socket kết nối.
     """
-    meeting = Meeting.objects(sid=sid).first()
-    if not meeting:
-        meeting = Meeting(
-            sid=sid,
-            user_id=user_id,
-            status="in_progress",
-            title=title or "Untitled Meeting"
+    try:
+        Meeting.objects(sid=sid).update_one(
+            set_on_insert__sid=sid,
+            set_on_insert__user_id=user_id,
+            set_on_insert__status="in_progress",
+            set_on_insert__title=title or "Untitled Meeting",
+            upsert=True,
         )
-        meeting.save()
-    elif title and title != meeting.title:
+    except NotUniqueError:
+        pass
+
+    meeting = Meeting.objects(sid=sid).first()
+    if meeting and title and title != meeting.title:
         meeting.title = title
         meeting.save()
     return meeting

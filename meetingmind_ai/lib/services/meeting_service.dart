@@ -30,10 +30,12 @@ class MeetingService {
   Stream<String> get statusStream => _statusController.stream;
   bool get isRecording => _isRecording;
 
-  void connect() {
+  Future<void> connect() async {
     if (_socket != null && _socket!.connected) return;
 
     print("Connecting to $_serverUrl...");
+
+    final completer = Completer<void>();
 
     // Truyền user_id vào query params khi connect
     _socket = IO.io(_serverUrl, <String, dynamic>{
@@ -50,6 +52,9 @@ class MeetingService {
       print('Connected to Server');
       _statusController.add('Connected');
       _syncMeetingMeta();
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
     });
 
     _socket!.on('disconnect', (_) {
@@ -68,7 +73,12 @@ class MeetingService {
 
     _socket!.on('error', (error) {
       print('Socket Error: $error');
+      if (!completer.isCompleted) {
+        completer.completeError(error);
+      }
     });
+
+    await completer.future;
   }
 
   void disconnect() {
@@ -80,9 +90,12 @@ class MeetingService {
   void startStreaming({String? title}) {
     final payloadTitle = (title ?? meetingTitle)?.trim();
     if (payloadTitle != null && payloadTitle.isNotEmpty) {
-      _socket?.emit('start_streaming', {'title': payloadTitle});
+      _socket?.emit('start_streaming', {
+        'title': payloadTitle,
+        'user_id': userId,
+      });
     } else {
-      _socket?.emit('start_streaming');
+      _socket?.emit('start_streaming', {'user_id': userId});
     }
     _isRecording = true;
     _statusController.add('Recording started');

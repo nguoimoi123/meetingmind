@@ -44,7 +44,7 @@ def _send_invite_email(email: str, team_name: str, invite_link: str):
     msg["From"] = sender
     msg["To"] = email
 
-    text = f"You were invited to join {team_name}. Open: {invite_link}"
+    text = f"Chào mừng mày đến với {team_name}. Open: {invite_link}"
     msg.attach(MIMEText(text, "plain"))
 
     with smtplib.SMTP(host, port) as server:
