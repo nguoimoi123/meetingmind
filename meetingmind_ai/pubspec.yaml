@@ -13,6 +13,8 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
+  graphview: ^1.2.0
+
   flutter_dotenv: ^5.0.2
 
   docx_to_text: ^1.0.0

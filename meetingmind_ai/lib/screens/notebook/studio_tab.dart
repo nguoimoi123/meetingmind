@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import '../../services/studio_service.dart';
+import '../../services/mindmap_service.dart';
 import '../../providers/auth_provider.dart';
+import 'features/audio_summary_card.dart';
+import 'features/mindmap_card.dart';
+import 'features/quick_summary_card.dart';
+import 'features/flashcards_card.dart';
+import 'mindmap_screen.dart';
 
 class StudioTab extends StatefulWidget {
   final String folderId;
@@ -15,6 +21,7 @@ class StudioTab extends StatefulWidget {
 class _StudioTabState extends State<StudioTab> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isGenerating = false;
+  bool _isGeneratingMindmap = false;
   String? _currentAudioUrl;
   bool _isPlaying = false;
   String? _playingFileId;
@@ -36,8 +43,27 @@ class _StudioTabState extends State<StudioTab> {
     try {
       final results = await StudioService.getResultsByFolder(widget.folderId);
       
+      print('📊 Loaded ${results.length} results');
+      
       setState(() {
         _generatedFiles = results.map((result) {
+          print('📝 Processing result: ${result['name']} (${result['type']})');
+          
+          // Lấy graph data từ metadata nếu là mindmap
+          Map<String, dynamic>? graphData;
+          if (result['type'] == 'mindmap' && result['metadata'] != null) {
+            final metadata = result['metadata'];
+            print('🔍 Metadata type: ${metadata.runtimeType}');
+            print('🔍 Metadata content: $metadata');
+            
+            if (metadata is Map && metadata['graph_data'] != null) {
+              graphData = Map<String, dynamic>.from(metadata['graph_data']);
+              print('✅ Graph data extracted: ${graphData.keys}');
+            } else {
+              print('⚠️ No graph_data in metadata');
+            }
+          }
+          
           return {
             'id': result['id'] ?? '',
             'name': result['name'] ?? 'Unknown',
@@ -47,6 +73,7 @@ class _StudioTabState extends State<StudioTab> {
             'date': _formatDate(result['created_at']),
             'color': _getColorForType(result['type']),
             'audioUrl': result['type'] == 'audio_summary' ? result['url'] : null,
+            'graphData': graphData,
             'resultId': result['id'],
           };
         }).toList();
@@ -87,7 +114,7 @@ class _StudioTabState extends State<StudioTab> {
       case 'audio_summary':
         return Icons.audiotrack_rounded;
       case 'mindmap':
-        return Icons.image_rounded;
+        return Icons.account_tree_rounded;
       case 'quick_summary':
         return Icons.picture_as_pdf_rounded;
       case 'flashcards':
@@ -296,34 +323,129 @@ class _StudioTabState extends State<StudioTab> {
       );
     }
   }
+  Future<void> _generateMindmap() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.userId;
+    
+    if (userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Vui lòng đăng nhập để sử dụng tính năng này'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    
+    setState(() {
+      _isGeneratingMindmap = true;
+    });
 
-  // Dữ liệu các tính năng
-  final List<Map<String, dynamic>> _features = [
-    {
-      'title': 'Tóm tắt âm thanh',
-      'description': 'Chuyển văn bản thành giọng đọc tự nhiên.',
-      'icon': Icons.headphones_rounded,
-      'colors': [const Color(0xFF7F00FF), const Color(0xFFE100FF)], // Purple Gradient
-    },
-    {
-      'title': 'Bảng đồ tư duy',
-      'description': 'Trực quan hóa ý tưởng và mối liên hệ.',
-      'icon': Icons.account_tree_rounded,
-      'colors': [const Color(0xFF00C6FF), const Color(0xFF0072FF)], // Blue Gradient
-    },
-    {
-      'title': 'Tóm tắt nhanh',
-      'description': 'Trích xuất ý chính chỉ trong vài giây.',
-      'icon': Icons.auto_awesome_rounded,
-      'colors': [const Color(0xFF56AB2F), const Color(0xFFA8E063)], // Green Gradient
-    },
-    {
-      'title': 'Flashcards',
-      'description': 'Tạo thẻ ghi nhớ ôn tập hiệu quả.',
-      'icon': Icons.style_rounded,
-      'colors': [const Color(0xFFF7971E), const Color(0xFFFFD200)], // Yellow Gradient
-    },
-  ];
+    try {
+      final result = await MindmapService.generateMindmap(
+        widget.folderId,
+        userId,
+        name: 'Sơ đồ tư duy ${DateTime.now().day}/${DateTime.now().month}',
+      );
+      
+      setState(() {
+        _isGeneratingMindmap = false;
+      });
+
+      if (result['success'] == true && mounted) {
+        final graphData = result['graph'] as Map<String, dynamic>;
+        final resultId = result['result_id'] as String;
+        
+        // Thêm vào danh sách results
+        final newMindmapFile = {
+          'id': 'mindmap_${DateTime.now().millisecondsSinceEpoch}',
+          'name': result['name'] ?? 'Sơ đồ tư duy',
+          'type': 'Sơ đồ tư duy',
+          'icon': Icons.account_tree_rounded,
+          'size': '',
+          'date': 'Vừa xong',
+          'color': const Color(0xFF00C6FF),
+          'resultId': resultId,
+          'graphData': graphData,
+        };
+
+        setState(() {
+          _generatedFiles.insert(0, newMindmapFile);
+        });
+        
+        // Navigate to mindmap screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MindmapScreen(
+              graphData: graphData,
+              title: result['name'] ?? 'Sơ đồ tư duy',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isGeneratingMindmap = false;
+      });
+      
+      if (mounted) {
+        if (e.toString().contains('No content found')) {
+          final colorScheme = Theme.of(context).colorScheme;
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.folder_open_rounded,
+                    color: colorScheme.primary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text('Chưa có tài liệu'),
+                  ),
+                ],
+              ),
+              content: const Text(
+                'Vui lòng tải tài liệu lên trước khi sử dụng tính năng này.',
+                style: TextStyle(fontSize: 15),
+              ),
+              actions: [
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Đã hiểu',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Lỗi: ${e.toString()}'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+
 
   // Dữ liệu file kết quả (có thể thay đổi)
   List<Map<String, dynamic>> _generatedFiles = [];
@@ -373,13 +495,30 @@ class _StudioTabState extends State<StudioTab> {
                 crossAxisSpacing: 16,
                 childAspectRatio: 0.85, // Tỷ lệ khung hình thẻ
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final feature = _features[index];
-                  return _buildFeatureCard(feature, colorScheme);
-                },
-                childCount: _features.length,
-              ),
+              delegate: SliverChildListDelegate([
+                AudioSummaryCard(
+                  isGenerating: _isGenerating,
+                  onTap: _generateAndPlayAudio,
+                ),
+                MindmapCard(
+                  isGenerating: _isGeneratingMindmap,
+                  onTap: _generateMindmap,
+                ),
+                QuickSummaryCard(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Mở tính năng: Tóm tắt nhanh')),
+                    );
+                  },
+                ),
+                FlashcardsCard(
+                  onTap: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Mở tính năng: Flashcards')),
+                    );
+                  },
+                ),
+              ]),
             ),
           ),
           
@@ -453,106 +592,6 @@ class _StudioTabState extends State<StudioTab> {
             child: SizedBox(height: 100),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildFeatureCard(Map<String, dynamic> feature, ColorScheme colorScheme) {
-    final List<Color> colors = feature['colors'];
-    final isAudioFeature = feature['title'] == 'Tóm tắt âm thanh';
-    
-    return InkWell(
-      onTap: () {
-        if (isAudioFeature) {
-          // Gọi API generate audio
-          _generateAndPlayAudio();
-        } else {
-          // Xử lý khi click vào các thẻ khác
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Mở tính năng: ${feature['title']}')),
-          );
-        }
-      },
-      borderRadius: BorderRadius.circular(24),
-      child: Container(
-        decoration: BoxDecoration(
-          // Nền Gradient
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: colors,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: colors.first.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Icon nền trắng trong suốt
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.25),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: _isGenerating && isAudioFeature
-                    ? const SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 3,
-                        ),
-                      )
-                    : Icon(
-                        feature['icon'],
-                        color: Colors.white,
-                        size: 28,
-                      ),
-              ),
-              
-              const Spacer(),
-
-              // Tiêu đề và mô tả
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    feature['title'],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    feature['description'],
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -687,11 +726,31 @@ class _StudioTabState extends State<StudioTab> {
       child: InkWell(
         onTap: () {
           final audioUrl = file['audioUrl'];
+          final graphData = file['graphData'];
+          
+          print('🔍 File tapped: ${file['name']}');
+          print('🔍 Has audioUrl: ${audioUrl != null}');
+          print('🔍 Has graphData: ${graphData != null}');
+          print('🔍 GraphData content: $graphData');
+          
           if (audioUrl != null) {
             // Nếu có audioUrl, phát audio
             _playAudioFile(file);
+          } else if (graphData != null) {
+            // Nếu có graphData, mở màn hình mindmap
+            print('✅ Opening mindmap screen...');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MindmapScreen(
+                  graphData: graphData as Map<String, dynamic>,
+                  title: file['name'],
+                ),
+              ),
+            );
           } else {
             // Các file khác
+            print('⚠️ No action for this file type');
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('Mở file: ${file['name']}'),

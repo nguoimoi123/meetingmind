@@ -22,8 +22,9 @@ from .models.meeting_model import Meeting
 from .models.folder_model import Folder
 from .models.file_model import File
 from .services.plan_service import ensure_default_upgrade_codes
-from .routes.tts_studio_service import tts_studio_bp
+from .routes.tts_studio_router import tts_studio_bp
 from .routes.studio_result_router import studio_result_bp
+from .routes.grap_visual_route import grap_visual_bp
 import app.sockets.meeting_socket
 import app.sockets.notification_socket
 
@@ -50,7 +51,7 @@ def create_app():
     app.register_blueprint(team_bp)
     app.register_blueprint(tts_studio_bp)
     app.register_blueprint(studio_result_bp)
-
+    app.register_blueprint(grap_visual_bp)
     # Seed default upgrade codes (admin will distribute these)
     try:
         ensure_default_upgrade_codes(plus_count=10, premium_count=10)

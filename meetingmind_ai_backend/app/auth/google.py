@@ -16,11 +16,27 @@ def google_login():
     token = data["id_token"]
 
     try:
-        idinfo = id_token.verify_oauth2_token(
-            token,
-            requests.Request(),
-            os.getenv("GOOGLE_OAUTH_CLIENT_ID")
-        )
+        # Support both Web and iOS Client IDs
+        web_client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+        ios_client_id = os.getenv("GOOGLE_IOS_CLIENT_ID")
+        
+        # Try Web Client ID first
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                token,
+                requests.Request(),
+                web_client_id
+            )
+        except ValueError:
+            # If Web fails, try iOS Client ID
+            if ios_client_id:
+                idinfo = id_token.verify_oauth2_token(
+                    token,
+                    requests.Request(),
+                    ios_client_id
+                )
+            else:
+                raise
 
         email = idinfo["email"]
         name = idinfo.get("name")
