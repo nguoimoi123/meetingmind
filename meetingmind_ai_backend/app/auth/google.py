@@ -19,7 +19,7 @@ def google_login():
         idinfo = id_token.verify_oauth2_token(
             token,
             requests.Request(),
-            os.getenv("GOOGLE_CLIENT_ID")
+            os.getenv("GOOGLE_OAUTH_CLIENT_ID")
         )
 
         email = idinfo["email"]

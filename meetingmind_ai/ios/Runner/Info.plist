@@ -6,8 +6,24 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	
+	<!-- ===== REQUIRED PERMISSIONS ===== -->
+	
+	<!-- Notifications -->
 	<key>NSUserNotificationsUsageDescription</key>
-	<string>This app needs to show notifications</string>
+	<string>This app needs to show notifications for meeting reminders and updates</string>
+	
+	<!-- Microphone - BẮT BUỘC: App ghi âm meetings -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>MeetingMind needs microphone access to record your meetings and create transcripts</string>
+	
+	<!-- Photo Library - BẮT BUỘC: App upload/download files -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>MeetingMind needs access to select files and documents for your meetings</string>
+	
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>MeetingMind needs access to save meeting reports and documents</string>
+	
 	<key>UIUserNotificationSettings</key> <!-- Cho phép âm thanh, badge, alert -->
 	<dict>
 		<key>UIUserNotificationTypes</key>
@@ -62,15 +78,17 @@
 	</array>
 
 	<!-- Google Sign In -->
+	<!-- iOS Client ID từ Google Cloud Console -->
 	<key>GIDClientID</key>
-	<string>YOUR_IOS_CLIENT_ID.apps.googleusercontent.com</string>
+	<string>712738392364-n5o8crvqsvplmla0us8n4c6uccdkg3qs.apps.googleusercontent.com</string>
 
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-			<string>com.googleusercontent.apps.YOUR_IOS_CLIENT_ID</string>
+			<!-- REVERSED Client ID -->
+			<string>com.googleusercontent.apps.712738392364-n5o8crvqsvplmla0us8n4c6uccdkg3qs</string>
 			</array>
 		</dict>
 	</array>

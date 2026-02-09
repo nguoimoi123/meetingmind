@@ -52,6 +52,7 @@ dependencies:
   record: ^5.0.0
   flutter_local_notifications: ^17.2.4
   timezone: ^0.9.4
+  audioplayers: ^6.0.0 # Để phát audio
 
 dev_dependencies:
   flutter_test:

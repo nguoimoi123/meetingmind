@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:provider/provider.dart';
+import '../../services/studio_service.dart';
+import '../../providers/auth_provider.dart';
 
 class StudioTab extends StatefulWidget {
   final String folderId;
@@ -9,6 +13,290 @@ class StudioTab extends StatefulWidget {
 }
 
 class _StudioTabState extends State<StudioTab> {
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isGenerating = false;
+  String? _currentAudioUrl;
+  bool _isPlaying = false;
+  String? _playingFileId;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadResults();
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadResults() async {
+    try {
+      final results = await StudioService.getResultsByFolder(widget.folderId);
+      
+      setState(() {
+        _generatedFiles = results.map((result) {
+          return {
+            'id': result['id'] ?? '',
+            'name': result['name'] ?? 'Unknown',
+            'type': _getTypeDisplayName(result['type']),
+            'icon': _getIconForType(result['type']),
+            'size': '', // Có thể tính từ result['size']
+            'date': _formatDate(result['created_at']),
+            'color': _getColorForType(result['type']),
+            'audioUrl': result['type'] == 'audio_summary' ? result['url'] : null,
+            'resultId': result['id'],
+          };
+        }).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi tải dữ liệu: ${e.toString()}'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getTypeDisplayName(String? type) {
+    switch (type) {
+      case 'audio_summary':
+        return 'Audio';
+      case 'mindmap':
+        return 'Sơ đồ tư duy';
+      case 'quick_summary':
+        return 'Tóm tắt';
+      case 'flashcards':
+        return 'Flashcards';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  IconData _getIconForType(String? type) {
+    switch (type) {
+      case 'audio_summary':
+        return Icons.audiotrack_rounded;
+      case 'mindmap':
+        return Icons.image_rounded;
+      case 'quick_summary':
+        return Icons.picture_as_pdf_rounded;
+      case 'flashcards':
+        return Icons.style_rounded;
+      default:
+        return Icons.insert_drive_file_rounded;
+    }
+  }
+
+  Color _getColorForType(String? type) {
+    switch (type) {
+      case 'audio_summary':
+        return const Color(0xFF7F00FF);
+      case 'mindmap':
+        return const Color(0xFF00C6FF);
+      case 'quick_summary':
+        return const Color(0xFF6366F1);
+      case 'flashcards':
+        return const Color(0xFFF7971E);
+      default:
+        return const Color(0xFF6366F1);
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return 'Unknown';
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+
+      if (diff.inMinutes < 1) {
+        return 'Vừa xong';
+      } else if (diff.inMinutes < 60) {
+        return '${diff.inMinutes} phút trước';
+      } else if (diff.inHours < 24) {
+        return '${diff.inHours} giờ trước';
+      } else if (diff.inDays < 7) {
+        return '${diff.inDays} ngày trước';
+      } else {
+        return '${(diff.inDays / 7).floor()} tuần trước';
+      }
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
+
+  Future<void> _generateAndPlayAudio() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final userId = authProvider.userId;
+    
+    if (userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Vui lòng đăng nhập để sử dụng tính năng này'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+    
+    setState(() {
+      _isGenerating = true;
+    });
+
+    try {
+      final result = await StudioService.generateAudio(widget.folderId, userId);
+      final audioUrl = result['audio_url'] as String?;
+      final resultId = result['result_id'] as String?;
+
+      if (audioUrl != null && audioUrl.isNotEmpty) {
+        // Thêm file audio vào danh sách kết quả
+        final newAudioFile = {
+          'id': 'audio_${DateTime.now().millisecondsSinceEpoch}',
+          'name': 'Tóm tắt âm thanh.mp3',
+          'type': 'Audio',
+          'icon': Icons.audiotrack_rounded,
+          'size': '',
+          'date': 'Vừa xong',
+          'color': const Color(0xFF7F00FF),
+          'audioUrl': audioUrl,
+          'resultId': resultId,
+        };
+
+        setState(() {
+          _generatedFiles.insert(0, newAudioFile);
+          _currentAudioUrl = audioUrl;
+          _isGenerating = false;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Audio đã được tạo! Nhấn vào thẻ để phát.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Không nhận được URL audio');
+      }
+    } catch (e) {
+      setState(() {
+        _isGenerating = false;
+      });
+      
+      if (mounted) {
+        // Kiểm tra nếu là lỗi 404 (không có content)
+        if (e.toString().contains('No content found')) {
+          final colorScheme = Theme.of(context).colorScheme;
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.folder_open_rounded,
+                    color: colorScheme.primary,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text('Chưa có tài liệu'),
+                  ),
+                ],
+              ),
+              content: const Text(
+                'Vui lòng tải tài liệu lên trước khi sử dụng tính năng này.',
+                style: TextStyle(fontSize: 15),
+              ),
+              actions: [
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Đã hiểu',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          // Các lỗi khác hiển thị snackbar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Lỗi: ${e.toString()}'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _playAudioFile(Map<String, dynamic> file) async {
+    final audioUrl = file['audioUrl'] as String?;
+    final fileId = file['id'] as String;
+
+    if (audioUrl == null) return;
+
+    // Nếu đang phát file này, thì pause
+    if (_isPlaying && _playingFileId == fileId) {
+      await _audioPlayer.pause();
+      setState(() {
+        _isPlaying = false;
+      });
+      return;
+    }
+
+    // Nếu đang phát file khác, dừng và phát file mới
+    if (_isPlaying && _playingFileId != fileId) {
+      await _audioPlayer.stop();
+    }
+
+    // Phát audio
+    await _audioPlayer.play(UrlSource(audioUrl));
+    setState(() {
+      _isPlaying = true;
+      _playingFileId = fileId;
+    });
+
+    // Lắng nghe khi audio kết thúc
+    _audioPlayer.onPlayerComplete.listen((_) {
+      setState(() {
+        _isPlaying = false;
+        _playingFileId = null;
+      });
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🎵 Đang phát ${file['name']}...'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   // Dữ liệu các tính năng
   final List<Map<String, dynamic>> _features = [
     {
@@ -37,36 +325,8 @@ class _StudioTabState extends State<StudioTab> {
     },
   ];
 
-  // Dữ liệu file kết quả (mock data)
-  final List<Map<String, dynamic>> _generatedFiles = [
-    {
-      'id': '1',
-      'name': 'Summary_Q4_Report.pdf',
-      'type': 'Tóm tắt',
-      'icon': Icons.picture_as_pdf_rounded,
-      'size': '2.4 MB',
-      'date': '2 giờ trước',
-      'color': const Color(0xFF6366F1),
-    },
-    {
-      'id': '2',
-      'name': 'Mindmap_Strategy.png',
-      'type': 'Bảng đồ tư duy',
-      'icon': Icons.image_rounded,
-      'size': '1.8 MB',
-      'date': '5 giờ trước',
-      'color': const Color(0xFF00C6FF),
-    },
-    {
-      'id': '3',
-      'name': 'Flashcards_Marketing.pdf',
-      'type': 'Flashcards',
-      'icon': Icons.picture_as_pdf_rounded,
-      'size': '856 KB',
-      'date': '1 ngày trước',
-      'color': const Color(0xFFF7971E),
-    },
-  ];
+  // Dữ liệu file kết quả (có thể thay đổi)
+  List<Map<String, dynamic>> _generatedFiles = [];
 
   @override
   Widget build(BuildContext context) {
@@ -199,14 +459,19 @@ class _StudioTabState extends State<StudioTab> {
 
   Widget _buildFeatureCard(Map<String, dynamic> feature, ColorScheme colorScheme) {
     final List<Color> colors = feature['colors'];
+    final isAudioFeature = feature['title'] == 'Tóm tắt âm thanh';
     
     return InkWell(
       onTap: () {
-        // Xử lý khi click vào thẻ
-        // Ví dụ: Navigator.push(...);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Mở tính năng: ${feature['title']}')),
-        );
+        if (isAudioFeature) {
+          // Gọi API generate audio
+          _generateAndPlayAudio();
+        } else {
+          // Xử lý khi click vào các thẻ khác
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Mở tính năng: ${feature['title']}')),
+          );
+        }
       },
       borderRadius: BorderRadius.circular(24),
       child: Container(
@@ -239,11 +504,20 @@ class _StudioTabState extends State<StudioTab> {
                   color: Colors.white.withOpacity(0.25),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
-                  feature['icon'],
-                  color: Colors.white,
-                  size: 28,
-                ),
+                child: _isGenerating && isAudioFeature
+                    ? const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 3,
+                        ),
+                      )
+                    : Icon(
+                        feature['icon'],
+                        color: Colors.white,
+                        size: 28,
+                      ),
               ),
               
               const Spacer(),
@@ -365,17 +639,68 @@ class _StudioTabState extends State<StudioTab> {
           ),
         ) ?? false;
       },
-      onDismissed: (direction) {
+      onDismissed: (direction) async {
         if (direction == DismissDirection.endToStart) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Đã xóa ${file['name']}'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          final resultId = file['resultId'];
+          if (resultId != null) {
+            try {
+              await StudioService.deleteResult(resultId);
+              setState(() {
+                _generatedFiles.removeWhere((f) => f['id'] == file['id']);
+              });
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Đã xóa ${file['name']}'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Lỗi khi xóa: ${e.toString()}'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+              // Reload lại dữ liệu
+              _loadResults();
+            }
+          } else {
+            setState(() {
+              _generatedFiles.removeWhere((f) => f['id'] == file['id']);
+            });
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Đã xóa ${file['name']}'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          }
         }
       },
-      child: Container(
+      child: InkWell(
+        onTap: () {
+          final audioUrl = file['audioUrl'];
+          if (audioUrl != null) {
+            // Nếu có audioUrl, phát audio
+            _playAudioFile(file);
+          } else {
+            // Các file khác
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Mở file: ${file['name']}'),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+        child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -467,12 +792,23 @@ class _StudioTabState extends State<StudioTab> {
               ),
             ),
             const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.5),
-              size: 24,
-            ),
+            // Hiển thị icon play/pause nếu là file audio
+            if (file['audioUrl'] != null)
+              Icon(
+                _isPlaying && _playingFileId == file['id']
+                    ? Icons.pause_circle_filled_rounded
+                    : Icons.play_circle_filled_rounded,
+                color: file['color'],
+                size: 28,
+              )
+            else
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                size: 24,
+              ),
           ],
+        ),
         ),
       ),
     );
