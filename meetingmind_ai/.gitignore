@@ -28,6 +28,9 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+.env
+.env.*
+!.env.example
 
 # Symbolication related
 app.*.symbols
@@ -65,3 +68,4 @@ app.*.map.json
 **/linux/.plugin_symlinks/
 
 meetingmind_ai/lib/config/ai_keys.dart
+meetingmind_ai/lib/config/api_config.dart
