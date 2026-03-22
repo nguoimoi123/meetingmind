@@ -18,3 +18,14 @@ class Config:
     CLOUD_NAME = os.getenv("CLOUD_NAME")
     API_KEY = os.getenv("API_KEY")
     API_SECRET = os.getenv("API_SECRET")
+    ADMIN_DASHBOARD_KEY = os.getenv("ADMIN_DASHBOARD_KEY") or SECRET_KEY
+    PAYMENT_WEBHOOK_SECRET = os.getenv("PAYMENT_WEBHOOK_SECRET")
+    VNPAY_TMN_CODE = os.getenv("VNPAY_TMN_CODE")
+    VNPAY_HASH_SECRET = os.getenv("VNPAY_HASH_SECRET")
+    VNPAY_PAYMENT_URL = (
+        os.getenv("VNPAY_PAYMENT_URL")
+        or "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+    )
+    VNPAY_RETURN_URL = os.getenv("VNPAY_RETURN_URL")
+    VNPAY_IPN_URL = os.getenv("VNPAY_IPN_URL")
+    VNPAY_LOCALE = os.getenv("VNPAY_LOCALE") or "vn"

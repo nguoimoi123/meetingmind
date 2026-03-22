@@ -73,7 +73,7 @@ class ChatNotebookController:
                     "content": f"Context: {context}\n\nQuestion: {question}"
                 }
             ],
-            max_tokens=200,
+            max_tokens=1000,
             temperature=0.2
         )
         answer = completion.choices[0].message.content

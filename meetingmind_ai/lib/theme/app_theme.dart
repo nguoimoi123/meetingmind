@@ -3,328 +3,391 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // =================================================================
-  // 1. CÁC MÀU SẮC NGUỒN (SOURCE OF TRUTH)
-  // Phong cách Monochrome (Đen - Trắng - Xám) kết hợp Icon Sống động
-  // =================================================================
+  static const Color primaryColor = Color(0xFF1D4ED8);
+  static const Color secondaryColor = Color(0xFF0F172A);
+  static const Color accentColor = Color(0xFF38BDF8);
+  static const Color successColor = Color(0xFF16A34A);
+  static const Color warningColor = Color(0xFFF59E0B);
+  static const Color errorColor = Color(0xFFDC2626);
 
-  // Màu chính: ĐEN TUYỐT ĐỐI -> Dùng cho các nút bấm chính, FAB
-  static const Color primaryColor = Color(0xFF000000);
+  static const Color lightScaffold = Color(0xFFF4F7FB);
+  static const Color lightSurface = Color(0xFFFFFFFF);
+  static const Color lightSurfaceAlt = Color(0xFFE8EEF8);
+  static const Color lightText = Color(0xFF0F172A);
+  static const Color lightMutedText = Color(0xFF64748B);
+  static const Color lightBorder = Color(0xFFD9E2F0);
 
-  // Màu phụ: Xám Đậm -> Dùng cho các icon hoặc trạng thái active
-  static const Color accentColor = Color(0xFF121212);
+  static const Color darkScaffold = Color(0xFF081120);
+  static const Color darkSurface = Color(0xFF0F1B2D);
+  static const Color darkSurfaceAlt = Color(0xFF16263D);
+  static const Color darkText = Color(0xFFF8FAFC);
+  static const Color darkMutedText = Color(0xFF9FB1C9);
+  static const Color darkBorder = Color(0xFF22324A);
 
-  // Màu thứ cấp: Xám Nhạt -> Dùng cho văn bản mô tả (Body text)
-  static const Color secondaryColor = Color(0xFF757575);
+  static Color? backgroundColor;
 
-  // Nền ứng dụng: TRẮNG TINH
-  static const Color backgroundColor = Color(0xFFFFFFFF);
-
-  // Màu bề mặt: TRẮNG
-  static const Color surfaceColor = Color(0xFFFFFFFF);
-
-  static const Color errorColor =
-      Color(0xFFD32F2F); // Giữ màu đỏ chuẩn Material
-  static const Color successColor = Color(0xFF2E7D32);
-  static const Color brightBluer =
-      Color(0xFF000000); // Đổi sang đen cho đồng bộ
-
-  // -----------------------------------------------------------------
-  // MỚI: MÀU SẮC ICON SỐNG ĐỘNG (VIBRANT ICON COLOR)
-  // Dùng để tạo điểm nhấn đa dạng cho các icon, thay vì chỉ đen trắng
-  // -----------------------------------------------------------------
-  static const Color vibrantIconColor =
-      Color(0xFF2962FF); // Xanh Azure đậm rực rỡ
-
-  // Dark Mode Colors (Đảo ngược: Nền đen, chữ trắng)
-  static const Color darkBackgroundColor = Color(0xFF000000);
-  static const Color darkSurfaceColor = Color(0xFF121212);
-  static const Color darkOnSurfaceColor = Color(0xFFFFFFFF);
-
-  // =================================================================
-  // 2. LIGHT THEME
-  // =================================================================
-  static ThemeData get light {
-    final ColorScheme colorScheme = const ColorScheme.light(
-      primary: primaryColor, // Đen
-      secondary: accentColor, // Xám đậm
-      surface: surfaceColor, // Trắng
-      background: backgroundColor, // Trắng
-      error: errorColor,
-      onPrimary: Colors.white, // Chữ trên nút Đen là Trắng
-      onSecondary: Colors.white,
-      onSurface: Color(0xFF000000), // Chữ chính là Đen
-      onBackground: Color(0xFF000000),
+  static TextTheme _textTheme(Color text, Color muted) {
+    final base = GoogleFonts.plusJakartaSansTextTheme();
+    return base.copyWith(
+      headlineLarge: GoogleFonts.plusJakartaSans(
+        fontSize: 32,
+        fontWeight: FontWeight.w800,
+        color: text,
+        letterSpacing: -0.8,
+      ),
+      headlineMedium: GoogleFonts.plusJakartaSans(
+        fontSize: 26,
+        fontWeight: FontWeight.w800,
+        color: text,
+        letterSpacing: -0.6,
+      ),
+      headlineSmall: GoogleFonts.plusJakartaSans(
+        fontSize: 22,
+        fontWeight: FontWeight.w700,
+        color: text,
+        letterSpacing: -0.4,
+      ),
+      titleLarge: GoogleFonts.plusJakartaSans(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: text,
+      ),
+      titleMedium: GoogleFonts.plusJakartaSans(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: text,
+      ),
+      bodyLarge: GoogleFonts.plusJakartaSans(
+        fontSize: 15,
+        fontWeight: FontWeight.w500,
+        color: text,
+        height: 1.5,
+      ),
+      bodyMedium: GoogleFonts.plusJakartaSans(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: muted,
+        height: 1.45,
+      ),
+      bodySmall: GoogleFonts.plusJakartaSans(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: muted,
+        height: 1.4,
+      ),
+      labelLarge: GoogleFonts.plusJakartaSans(
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+      ),
     );
+  }
+
+  static ThemeData get light {
+    const colorScheme = ColorScheme.light(
+      primary: primaryColor,
+      secondary: accentColor,
+      surface: lightSurface,
+      error: errorColor,
+      onPrimary: Colors.white,
+      onSecondary: secondaryColor,
+      onSurface: lightText,
+      onError: Colors.white,
+    );
+
+    final textTheme = _textTheme(lightText, lightMutedText);
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: colorScheme,
-
-      // -----------------------------------------------------------------
-      // CẤU HÌNH ICON SỐNG ĐỘNG
-      // -----------------------------------------------------------------
-      iconTheme: const IconThemeData(
-        color: vibrantIconColor, // Icon mặc định sẽ có màu xanh rực rỡ
-        size: 24,
-      ),
-      primaryIconTheme: const IconThemeData(
-        color: vibrantIconColor,
-      ),
-
-      // Font chữ
-      textTheme: GoogleFonts.interTextTheme().copyWith(
-        // Tiêu đề màu ĐEN
-        headlineLarge: GoogleFonts.inter(
-            fontSize: 32,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF000000)),
-        headlineMedium: GoogleFonts.inter(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF000000)),
-
-        // Nội dung chính màu ĐEN
-        bodyLarge: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF000000)),
-
-        // Nội dung phụ màu XÂM
-        bodyMedium: GoogleFonts.inter(
-            fontSize: 14, fontWeight: FontWeight.w400, color: secondaryColor),
-
-        // Label (Nút bấm) chữ Trắng
-        labelLarge: GoogleFonts.inter(
-            fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
-      ),
-
-      // AppBar: Nền trắng, chữ đen
+      scaffoldBackgroundColor: lightScaffold,
+      textTheme: textTheme,
+      primaryTextTheme: textTheme,
+      dividerColor: lightBorder,
+      splashFactory: InkSparkle.splashFactory,
       appBarTheme: AppBarTheme(
-        backgroundColor: surfaceColor,
-        foregroundColor: Color(0xFF000000),
+        backgroundColor: Colors.transparent,
+        foregroundColor: lightText,
         elevation: 0,
-        centerTitle: true,
-        iconTheme: const IconThemeData(
-            color: Color(
-                0xFF000000)), // Icon AppBar giữ màu đen để nhấn mạnh sự tối giản
-        titleTextStyle: GoogleFonts.inter(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF000000)),
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: textTheme.titleLarge,
+        iconTheme: const IconThemeData(color: lightText),
         systemOverlayStyle: SystemUiOverlayStyle.dark,
       ),
-
-      // Card: Để tạo hiệu ứng "Giấy trên nền trắng", ta dùng màu xám rất nhạt cho nền thẻ
-      // hoặc dùng màu Trắng với viền xám.
-      // Ở đây tôi dùng màu Trắng với viền xám nhạt (Border)
       cardTheme: CardThemeData(
-        color: surfaceColor, // Nền thẻ trắng
-        elevation: 0, // Bỏ bóng
+        color: lightSurface,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: secondaryColor.withOpacity(0.06),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-          side: BorderSide(
-              color: Color(0xFFE0E0E0), width: 1), // Viền xám tinh tế
-        ),
-        margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-      ),
-
-      // Elevated Button: NỀN ĐEN, CHỮ TRẮNG
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor, // Nền đen
-          foregroundColor: Colors.white, // Chữ trắng
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(30)), // Bo tròn nhiều (Capsule style)
-          textStyle:
-              GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 16),
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: lightBorder),
         ),
       ),
-
-      // Outlined Button: Viền ĐEN, Chữ ĐEN
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Color(0xFF000000),
-          side: const BorderSide(color: Color(0xFF000000), width: 1.5),
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-        ),
-      ),
-
-      // TextField
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFFF5F5F5), // Nền ô input màu xám nhạt
+        fillColor: lightSurface,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        hintStyle: textTheme.bodyMedium,
+        labelStyle: textTheme.bodyMedium,
+        prefixIconColor: primaryColor,
+        suffixIconColor: lightMutedText,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none, // Bỏ viền mặc định
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: lightBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: lightBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF000000), width: 2),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: primaryColor, width: 1.6),
         ),
-        hintStyle: GoogleFonts.inter(color: secondaryColor),
-        // Icon trong TextField cũng mang màu sống động
-        prefixIconColor: vibrantIconColor,
-        suffixIconColor: vibrantIconColor,
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: errorColor),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: errorColor, width: 1.6),
+        ),
       ),
-
-      // Bottom Navigation
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: surfaceColor,
-        selectedItemColor:
-            vibrantIconColor, // Chuyển sang màu sống động khi được chọn
-        unselectedItemColor: Color(0xFF9E9E9E),
-        type: BottomNavigationBarType.fixed,
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: primaryColor.withOpacity(0.45),
+          disabledForegroundColor: Colors.white,
+          elevation: 0,
+          minimumSize: const Size.fromHeight(56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: textTheme.labelLarge,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: secondaryColor,
+          side: const BorderSide(color: lightBorder),
+          minimumSize: const Size.fromHeight(56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: textTheme.labelLarge,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: primaryColor,
+          textStyle: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: secondaryColor,
+        contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: lightSurface,
+        indicatorColor: primaryColor.withOpacity(0.12),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return textTheme.bodySmall?.copyWith(
+            color: selected ? primaryColor : lightMutedText,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? primaryColor : lightMutedText,
+            size: 24,
+          );
+        }),
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
-        showUnselectedLabels: true,
-        selectedLabelStyle:
-            GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12),
-        unselectedLabelStyle:
-            GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 12),
       ),
-
-      // Floating Action Button: NỀN ĐEN
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: primaryColor,
         foregroundColor: Colors.white,
-        elevation: 4,
+        elevation: 0,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: lightSurfaceAlt,
+        selectedColor: primaryColor.withOpacity(0.14),
+        secondarySelectedColor: primaryColor.withOpacity(0.14),
+        side: const BorderSide(color: lightBorder),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        extendedTextStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+        labelStyle: textTheme.bodySmall?.copyWith(color: lightText),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: lightSurface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: lightSurface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
       ),
     );
   }
 
-  // =================================================================
-  // 3. DARK THEME
-  // =================================================================
   static ThemeData get dark {
-    final ColorScheme colorScheme = const ColorScheme.dark(
-      primary: Colors.white, // Dark mode: Nút màu trắng
-      secondary: Color(0xFFE0E0E0),
-      surface: darkSurfaceColor,
-      background: darkBackgroundColor,
-      error: errorColor,
-      onPrimary: Colors.black, // Chữ trên nút trắng là đen
-      onSecondary: Colors.black,
-      onSurface: darkOnSurfaceColor,
-      onBackground: darkOnSurfaceColor,
+    const colorScheme = ColorScheme.dark(
+      primary: Color(0xFF60A5FA),
+      secondary: Color(0xFF7DD3FC),
+      surface: darkSurface,
+      error: Color(0xFFF87171),
+      onPrimary: secondaryColor,
+      onSecondary: secondaryColor,
+      onSurface: darkText,
+      onError: secondaryColor,
     );
+
+    final textTheme = _textTheme(darkText, darkMutedText);
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: colorScheme,
-
-      // -----------------------------------------------------------------
-      // CẤU HÌNH ICON SỐNG ĐỘNG (DARK MODE)
-      // -----------------------------------------------------------------
-      iconTheme: const IconThemeData(
-        color: vibrantIconColor, // Giữ màu xanh rực rỡ trong Dark Mode
-        size: 24,
-      ),
-      primaryIconTheme: const IconThemeData(
-        color: vibrantIconColor,
-      ),
-
-      textTheme: GoogleFonts.interTextTheme().copyWith(
-        headlineLarge: GoogleFonts.inter(
-            fontSize: 32,
-            fontWeight: FontWeight.w800,
-            color: darkOnSurfaceColor),
-        headlineMedium: GoogleFonts.inter(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: darkOnSurfaceColor),
-        bodyLarge: GoogleFonts.inter(
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-            color: darkOnSurfaceColor),
-        bodyMedium: GoogleFonts.inter(
-            fontSize: 14,
-            fontWeight: FontWeight.w400,
-            color: darkOnSurfaceColor.withOpacity(0.7)),
-        labelLarge: GoogleFonts.inter(
-            fontSize: 16, fontWeight: FontWeight.w600, color: Colors.black),
-      ),
+      scaffoldBackgroundColor: darkScaffold,
+      textTheme: textTheme,
+      primaryTextTheme: textTheme,
+      dividerColor: darkBorder,
       appBarTheme: AppBarTheme(
-        backgroundColor: darkSurfaceColor,
-        foregroundColor: darkOnSurfaceColor,
+        backgroundColor: Colors.transparent,
+        foregroundColor: darkText,
         elevation: 0,
-        centerTitle: true,
-        // Icon AppBar trong dark mode giữ màu trắng
-        iconTheme: const IconThemeData(color: darkOnSurfaceColor),
-        titleTextStyle: GoogleFonts.inter(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: darkOnSurfaceColor),
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: textTheme.titleLarge,
+        iconTheme: const IconThemeData(color: darkText),
         systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
       cardTheme: CardThemeData(
-        color: darkSurfaceColor,
+        color: darkSurface,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.0),
-          side: BorderSide(color: darkOnSurfaceColor.withOpacity(0.2)),
-        ),
-        margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white, // Nút trắng trong Dark mode
-          foregroundColor: Colors.black,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: darkBorder),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFF2C2C2C),
+        fillColor: darkSurfaceAlt,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        hintStyle: textTheme.bodyMedium,
+        labelStyle: textTheme.bodyMedium,
+        prefixIconColor: colorScheme.primary,
+        suffixIconColor: darkMutedText,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: darkBorder),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: darkBorder),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.white, width: 2),
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
         ),
-        hintStyle:
-            GoogleFonts.inter(color: darkOnSurfaceColor.withOpacity(0.5)),
-        // Icon trong TextField (Dark Mode)
-        prefixIconColor: vibrantIconColor,
-        suffixIconColor: vibrantIconColor,
       ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: darkSurfaceColor,
-        selectedItemColor:
-            vibrantIconColor, // Chuyển sang màu sống động khi được chọn
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: colorScheme.primary,
+          foregroundColor: secondaryColor,
+          disabledBackgroundColor: colorScheme.primary.withOpacity(0.45),
+          disabledForegroundColor: secondaryColor,
+          elevation: 0,
+          minimumSize: const Size.fromHeight(56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: textTheme.labelLarge,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: darkText,
+          side: const BorderSide(color: darkBorder),
+          minimumSize: const Size.fromHeight(56),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          textStyle: textTheme.labelLarge,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: colorScheme.primary,
+          textStyle: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: darkSurfaceAlt,
+        contentTextStyle: textTheme.bodyMedium,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: darkSurface,
+        indicatorColor: colorScheme.primary.withOpacity(0.2),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return textTheme.bodySmall?.copyWith(
+            color: selected ? colorScheme.primary : darkMutedText,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected ? colorScheme.primary : darkMutedText,
+            size: 24,
+          );
+        }),
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
-        selectedLabelStyle:
-            GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12),
-        unselectedLabelStyle:
-            GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 12),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: colorScheme.primary,
+        foregroundColor: secondaryColor,
+        elevation: 0,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: darkSurfaceAlt,
+        selectedColor: colorScheme.primary.withOpacity(0.2),
+        secondarySelectedColor: colorScheme.primary.withOpacity(0.2),
+        side: const BorderSide(color: darkBorder),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        labelStyle: textTheme.bodySmall?.copyWith(color: darkText),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: darkSurface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: darkSurface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
       ),
     );
   }

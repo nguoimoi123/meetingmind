@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 from .config import Config
 from .extensions import db, socketio
 from .auth.google import auth_bp
@@ -14,6 +14,8 @@ from .routes.reminder_routes import reminder_bp
 from .routes.report_routes import report_bp
 from .routes.search_routes import search_bp
 from .routes.team_routes import team_bp
+from .routes.admin_router import admin_bp
+from .routes.payment_router import payment_bp
 from .models.team_model import Team
 from .models.team_member_model import TeamMember
 from .models.team_event_model import TeamEvent
@@ -21,6 +23,8 @@ from .models.team_invite_model import TeamInvite
 from .models.meeting_model import Meeting
 from .models.folder_model import Folder
 from .models.file_model import File
+from .models.upgrade_request_model import UpgradeRequest
+from .models.user_notification_model import UserNotification
 from .services.plan_service import ensure_default_upgrade_codes
 from .routes.tts_studio_router import tts_studio_bp
 from .routes.studio_result_router import studio_result_bp
@@ -36,6 +40,17 @@ def create_app():
     db.init_app(app)
     socketio.init_app(app, cors_allowed_origins="*")
 
+    @app.after_request
+    def add_cors_headers(response):
+        origin = request.headers.get("Origin") or "*"
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, X-Admin-Key, X-Webhook-Secret"
+        )
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Vary"] = "Origin"
+        return response
+
     app.register_blueprint(bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(user_bp)
@@ -49,6 +64,8 @@ def create_app():
     app.register_blueprint(report_bp)
     app.register_blueprint(search_bp)
     app.register_blueprint(team_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(payment_bp)
     app.register_blueprint(tts_studio_bp)
     app.register_blueprint(studio_result_bp)
     app.register_blueprint(grap_visual_bp)
@@ -63,6 +80,8 @@ def create_app():
         Meeting.ensure_indexes()
         Folder.ensure_indexes()
         File.ensure_indexes()
+        UpgradeRequest.ensure_indexes()
+        UserNotification.ensure_indexes()
         Team.ensure_indexes()
         TeamMember.ensure_indexes()
         TeamEvent.ensure_indexes()

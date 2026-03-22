@@ -1,6 +1,9 @@
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
+import '../models/user_notification.dart';
 import 'notification_service.dart';
+import 'dart:async';
 
 class TeamNotificationService {
   TeamNotificationService._internal();
@@ -10,6 +13,11 @@ class TeamNotificationService {
 
   IO.Socket? _socket;
   String? _userId;
+  final StreamController<UserNotificationItem> _notificationController =
+      StreamController<UserNotificationItem>.broadcast();
+
+  Stream<UserNotificationItem> get notificationsStream =>
+      _notificationController.stream;
 
   void connect(String userId) {
     if (_socket != null && _socket!.connected && _userId == userId) return;
@@ -52,6 +60,45 @@ class TeamNotificationService {
         title: 'Team Event',
         body: 'New event: $title',
         payload: teamId == null ? null : 'team_event:$teamId',
+      );
+    });
+
+    _socket!.on('plan_upgrade_code_issued', (data) async {
+      final code = (data is Map && data['code'] != null)
+          ? data['code'].toString()
+          : '';
+      final plan = (data is Map && data['plan'] != null)
+          ? data['plan'].toString()
+          : 'plus';
+
+      if (code.isEmpty) {
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('pending_upgrade_code', code);
+      await prefs.setString('pending_upgrade_plan', plan);
+
+      NotificationService().showNotification(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: 'Upgrade code ready',
+        body: 'Your $plan code: $code',
+        payload: 'upgrade_code:$plan',
+      );
+    });
+
+    _socket!.on('user_notification', (data) async {
+      if (data is! Map) {
+        return;
+      }
+      final item = UserNotificationItem.fromJson(data.cast<String, dynamic>());
+      _notificationController.add(item);
+
+      NotificationService().showNotification(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        title: item.title,
+        body: item.body,
+        payload: 'app_notifications',
       );
     });
   }

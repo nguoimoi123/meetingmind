@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:meetingmind_ai/providers/auth_provider.dart';
+import 'package:meetingmind_ai/l10n/app_localizations.dart';
 import 'package:meetingmind_ai/services/search_service.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -64,6 +65,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = context.l10n;
 
     final meetings = (_result?['meetings'] as List?) ?? [];
     final notebooks = (_result?['notebooks'] as List?) ?? [];
@@ -72,7 +74,7 @@ class _SearchScreenState extends State<SearchScreen> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Search'),
+        title: Text(l10n.tr('search')),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -84,7 +86,7 @@ class _SearchScreenState extends State<SearchScreen> {
               controller: _controller,
               onSubmitted: (value) => _search(value.trim()),
               decoration: InputDecoration(
-                hintText: 'Search meetings, notebooks, files...',
+                hintText: l10n.tr('searchHint'),
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _controller.text.isNotEmpty
                     ? IconButton(
@@ -114,7 +116,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 : _result == null
                     ? Center(
                         child: Text(
-                          'Type a keyword to search',
+                          l10n.tr('typeKeyword'),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurface.withOpacity(0.6),
                           ),
@@ -123,35 +125,35 @@ class _SearchScreenState extends State<SearchScreen> {
                     : ListView(
                         children: [
                           _buildSection(
-                            'Meetings',
+                            l10n.tr('meetings'),
                             meetings,
                             (m) => ListTile(
                               leading: const Icon(Icons.videocam_rounded),
-                              title: Text(m['title'] ?? 'Untitled'),
+                              title: Text(m['title'] ?? l10n.tr('untitled')),
                               subtitle: Text(m['summary'] ?? ''),
                               onTap: () =>
                                   context.push('/post_summary/${m['id']}'),
                             ),
                           ),
                           _buildSection(
-                            'Notebooks',
+                            l10n.tr('notebooks'),
                             notebooks,
                             (n) => ListTile(
                               leading: const Icon(Icons.book_rounded),
-                              title: Text(n['title'] ?? 'Untitled'),
+                              title: Text(n['title'] ?? l10n.tr('untitled')),
                               subtitle: Text(n['description'] ?? ''),
                               onTap: () =>
                                   context.push('/notebook_detail/${n['id']}'),
                             ),
                           ),
                           _buildSection(
-                            'Files',
+                            l10n.tr('files'),
                             files,
                             (f) => ListTile(
                               leading: const Icon(Icons.description_outlined),
-                              title: Text(f['title'] ?? 'Untitled'),
+                              title: Text(f['title'] ?? l10n.tr('untitled')),
                               subtitle:
-                                  Text('Notebook: ${f['folder_id'] ?? ''}'),
+                                  Text(l10n.tr('notebookLabel', params: {'value': '${f['folder_id'] ?? ''}'})),
                               onTap: () => context
                                   .push('/notebook_detail/${f['folder_id']}'),
                             ),

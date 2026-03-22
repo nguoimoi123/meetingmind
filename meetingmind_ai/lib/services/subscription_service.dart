@@ -3,6 +3,31 @@ import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
 
 class SubscriptionService {
+  static Future<String> createVnpayCheckoutUrl({
+    required String userId,
+    required String plan,
+  }) async {
+    final res = await http.post(
+      Uri.parse('$apiBaseUrl/payments/vnpay/create'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'user_id': userId,
+        'plan': plan,
+      }),
+    );
+
+    final body = res.body.isNotEmpty ? jsonDecode(res.body) : {};
+
+    if (res.statusCode == 201) {
+      return body['payment_url']?.toString() ?? '';
+    }
+
+    final message = body is Map && body['error'] != null
+        ? body['error'].toString()
+        : 'Create payment failed';
+    throw Exception(message);
+  }
+
   static Future<List<String>> createUpgradeCodes({
     required String plan,
     int count = 1,

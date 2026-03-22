@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:meetingmind_ai/l10n/app_localizations.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -10,35 +11,7 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
-  int _currentPageIndex = 0;
-
-  // Dữ liệu onboarding (Đã loại bỏ imageAsset để dùng Code-generated Art)
-  final List<Map<String, dynamic>> _onboardingPages = [
-    {
-      'title': 'Chào mừng đến với\nMeetingMind AI',
-      'subtitle':
-          'Tóm tắt cuộc họp thông minh, không bỏ lỡ khoảnh khắc quan trọng nào.',
-      'icon': Icons.rocket_launch, // Icon chủ đạo
-      'bgColorStart': const Color(0xFF4facfe),
-      'bgColorEnd': const Color(0xFF00f2fe),
-    },
-    {
-      'title': 'Trợ lý cuộc họp\nthông minh',
-      'subtitle':
-          'Ghi âm, phiên âm tự động và trích xuất các ý chính. Bạn chỉ việc tập trung thảo luận.',
-      'icon': Icons.mic_none_rounded,
-      'bgColorStart': const Color(0xFFa18cd1),
-      'bgColorEnd': const Color(0xFFfbc2eb),
-    },
-    {
-      'title': 'Sổ tay AI\ncá nhân',
-      'subtitle':
-          'Tổ chức tài liệu, tìm kiếm thông tin nhanh chóng nhờ trí tuệ nhân tạo tích hợp.',
-      'icon': Icons.auto_stories_rounded,
-      'bgColorStart': const Color(0xFF84fab0),
-      'bgColorEnd': const Color(0xFF8fd3f4),
-    },
-  ];
+  var _currentPageIndex = 0;
 
   @override
   void dispose() {
@@ -46,129 +19,133 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
+  List<Map<String, dynamic>> _pages(BuildContext context) {
+    final isVi = Localizations.localeOf(context).languageCode == 'vi';
+    return [
+      {
+        'title': isVi
+            ? 'Chao mung den voi\nMeetingMind AI'
+            : 'Welcome to\nMeetingMind AI',
+        'subtitle': isVi
+            ? 'Tom tat cuoc hop thong minh, khong bo lo khoanh khac quan trong nao.'
+            : 'Smart meeting summaries without missing the moments that matter.',
+        'icon': Icons.rocket_launch_rounded,
+        'start': const Color(0xFF4FACFE),
+        'end': const Color(0xFF00F2FE),
+      },
+      {
+        'title': isVi
+            ? 'Tro ly cuoc hop\nthong minh'
+            : 'A smarter\nmeeting assistant',
+        'subtitle': isVi
+            ? 'Ghi am, phien am tu dong va trich xuat y chinh de ban tap trung thao luan.'
+            : 'Record, transcribe and extract key ideas so you can stay focused on the discussion.',
+        'icon': Icons.mic_none_rounded,
+        'start': const Color(0xFFA18CD1),
+        'end': const Color(0xFFFBC2EB),
+      },
+      {
+        'title': isVi ? 'So tay AI\nca nhan' : 'Your personal\nAI notebook',
+        'subtitle': isVi
+            ? 'To chuc tai lieu, tim kiem nhanh va tro chuyen voi AI trong cung mot noi.'
+            : 'Organize documents, search faster and chat with AI in one place.',
+        'icon': Icons.auto_stories_rounded,
+        'start': const Color(0xFF84FAB0),
+        'end': const Color(0xFF8FD3F4),
+      },
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = context.l10n;
+    final pages = _pages(context);
 
     return Scaffold(
-      // Nền sáng sủa, hiện đại
       backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
-            // --- Nút "Bỏ qua" ---
             Align(
               alignment: Alignment.topRight,
               child: Padding(
-                padding: const EdgeInsets.all(20.0),
+                padding: const EdgeInsets.all(20),
                 child: TextButton(
                   onPressed: () => context.go('/login'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                  child: const Text('Bỏ qua'),
+                  child: Text(l10n.tr('skip')),
                 ),
               ),
             ),
-
-            // --- PageView (Nội dung chính) ---
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
-                onPageChanged: (index) =>
-                    setState(() => _currentPageIndex = index),
-                itemCount: _onboardingPages.length,
+                itemCount: pages.length,
+                onPageChanged: (index) {
+                  setState(() => _currentPageIndex = index);
+                },
                 itemBuilder: (context, index) {
-                  final data = _onboardingPages[index];
-                  // Sử dụng TweenAnimationBuilder để tạo hiệu ứng mỗi khi chuyển trang
-                  return TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0, end: 1),
-                    duration: const Duration(milliseconds: 600),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, child) {
-                      return Transform.translate(
-                        offset: Offset(
-                            0, 50 * (1 - value)), // Hiệu ứng trượt từ dưới lên
-                        child: Opacity(
-                          opacity: value,
-                          child: _buildOnboardingPage(
-                            context,
-                            data['title'],
-                            data['subtitle'],
-                            data['icon'],
-                            data['bgColorStart'],
-                            data['bgColorEnd'],
-                          ),
-                        ),
-                      );
-                    },
+                  final page = pages[index];
+                  return _OnboardingPage(
+                    title: page['title'] as String,
+                    subtitle: page['subtitle'] as String,
+                    icon: page['icon'] as IconData,
+                    start: page['start'] as Color,
+                    end: page['end'] as Color,
                   );
                 },
               ),
             ),
-
-            // --- Phần điều khiển dưới cùng ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
               child: Column(
                 children: [
-                  // Indicators (Chấm tròn)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(
-                      _onboardingPages.length,
-                      (index) => _buildPageIndicator(
-                        isActive: index == _currentPageIndex,
-                        color: colorScheme.primary,
+                      pages.length,
+                      (index) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: index == _currentPageIndex ? 28 : 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: index == _currentPageIndex
+                              ? colorScheme.primary
+                              : colorScheme.outline.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 40),
-
-                  // Nút Tiếp tục / Bắt đầu
                   SizedBox(
                     width: double.infinity,
-                    height: 56, // Chiều cao cố định cho nút
+                    height: 56,
                     child: ElevatedButton(
                       onPressed: () {
-                        if (_currentPageIndex < _onboardingPages.length - 1) {
+                        if (_currentPageIndex < pages.length - 1) {
                           _pageController.nextPage(
-                            duration: const Duration(milliseconds: 400),
+                            duration: const Duration(milliseconds: 300),
                             curve: Curves.easeInOut,
                           );
                         } else {
                           context.go('/login');
                         }
                       },
-                      style: ElevatedButton.styleFrom(
-                        elevation: 0,
-                        shadowColor: Colors.transparent,
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: colorScheme.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(30), // Bo tròn đầy
-                        ),
-                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            _currentPageIndex == _onboardingPages.length - 1
-                                ? 'Bắt đầu ngay'
-                                : 'Tiếp tục',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
+                            _currentPageIndex == pages.length - 1
+                                ? l10n.tr('getStartedNow')
+                                : l10n.tr('continue'),
                           ),
-                          if (_currentPageIndex < _onboardingPages.length - 1)
+                          if (_currentPageIndex < pages.length - 1) ...[
                             const SizedBox(width: 8),
-                          if (_currentPageIndex < _onboardingPages.length - 1)
                             const Icon(Icons.arrow_forward_rounded, size: 20),
+                          ],
                         ],
                       ),
                     ),
@@ -181,32 +158,38 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
+}
 
-  // Widget xây dựng nội dung từng trang
-  Widget _buildOnboardingPage(
-    BuildContext context,
-    String title,
-    String subtitle,
-    IconData icon,
-    Color colorStart,
-    Color colorEnd,
-  ) {
+class _OnboardingPage extends StatelessWidget {
+  const _OnboardingPage({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.start,
+    required this.end,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color start;
+  final Color end;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // --- 1. Hình minh họa trừu tượng (Abstract Illustration) ---
           SizedBox(
-            height: size.height * 0.35, // Chiếm 35% chiều cao màn hình
+            height: size.height * 0.35,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Hình tròn nền mờ (Decorative Blob)
                 Container(
                   width: 280,
                   height: 280,
@@ -216,115 +199,47 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        colorStart.withOpacity(0.2),
-                        colorEnd.withOpacity(0.1),
+                        start.withOpacity(0.2),
+                        end.withOpacity(0.08),
                       ],
                     ),
                   ),
                 ),
-
-                // Khung chứa Icon chính (Card nổi)
                 Container(
-                  padding: const EdgeInsets.all(40),
+                  width: 170,
+                  height: 170,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    gradient: LinearGradient(colors: [start, end]),
                     borderRadius: BorderRadius.circular(40),
                     boxShadow: [
                       BoxShadow(
-                        color: colorStart.withOpacity(0.3),
-                        blurRadius: 40,
-                        offset: const Offset(0, 20),
+                        color: start.withOpacity(0.25),
+                        blurRadius: 24,
+                        offset: const Offset(0, 12),
                       ),
                     ],
                   ),
-                  child: Icon(
-                    icon,
-                    size: 80,
-                    color: colorStart, // Dùng màu gradient đầu cho icon
-                  ),
-                ),
-
-                // Các điểm trang trí xung quanh (Floating Bubbles)
-                Positioned(
-                  top: 20,
-                  right: 40,
-                  child: _buildFloatingDot(colorEnd),
-                ),
-                Positioned(
-                  bottom: 30,
-                  left: 30,
-                  child: _buildFloatingDot(colorStart),
+                  child: Icon(icon, color: Colors.white, size: 72),
                 ),
               ],
             ),
           ),
-
-          const SizedBox(height: 48),
-
-          // --- 2. Tiêu đề ---
+          const SizedBox(height: 36),
           Text(
             title,
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
-              height: 1.2, // Giảm chiều cao dòng để title gọn hơn
+              fontWeight: FontWeight.w800,
+              height: 1.15,
             ),
           ),
-
-          const SizedBox(height: 24),
-
-          // --- 3. Mô tả ---
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-                height: 1.5, // Tăng chiều cao dòng để dễ đọc
-                fontSize: 15,
-              ),
-            ),
+          const SizedBox(height: 14),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(height: 1.6),
           ),
         ],
-      ),
-    );
-  }
-
-  // Widget tạo chấm trang trí nhỏ
-  Widget _buildFloatingDot(Color color) {
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.8),
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.4),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          )
-        ],
-      ),
-    );
-  }
-
-  // Widget vẽ chấm tròn điều hướng (Indicator) hiện đại
-  Widget _buildPageIndicator({
-    required bool isActive,
-    required Color color,
-  }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      height: isActive ? 8 : 8,
-      width: isActive ? 32 : 8, // Kéo dài ra khi active
-      decoration: BoxDecoration(
-        color: isActive ? color : Colors.grey.shade300,
-        borderRadius: BorderRadius.circular(10),
       ),
     );
   }

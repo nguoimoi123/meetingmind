@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MeetingMind Admin Console</title>
+  <style>
+    :root {
+      --bg: #eef3fb;
+      --card: rgba(255,255,255,.92);
+      --text: #102033;
+      --muted: #64748b;
+      --primary: #1061ff;
+      --primary-soft: rgba(16,97,255,.1);
+      --accent: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --border: rgba(16,32,51,.09);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(16,97,255,.14), transparent 26%),
+        radial-gradient(circle at bottom right, rgba(16,185,129,.12), transparent 24%),
+        linear-gradient(180deg, #eff4fb 0%, #eef2f8 100%);
+    }
+    .wrap {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .panel {
+      background: var(--card);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(255,255,255,.7);
+      box-shadow: 0 22px 60px rgba(17,24,39,.08);
+      border-radius: 24px;
+      padding: 20px;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    h1, h2 { margin: 0; }
+    .muted { color: var(--muted); line-height: 1.6; }
+    .pill {
+      display: inline-flex;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-weight: 800;
+      font-size: 12px;
+      letter-spacing: .02em;
+    }
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin: 18px 0 20px;
+    }
+    .stat {
+      background: rgba(255,255,255,.74);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 18px;
+    }
+    .stat span { color: var(--muted); font-size: 13px; }
+    .stat strong { display:block; margin-top:6px; font-size: 30px; }
+    .toolbar, .form-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+    .toolbar { margin-top: 12px; }
+    .form-grid { margin-top: 16px; }
+    input, select, textarea, button {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      font-size: 14px;
+      background: white;
+    }
+    textarea { min-height: 92px; resize: vertical; }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: rgba(16,97,255,.3);
+      box-shadow: 0 0 0 4px rgba(16,97,255,.08);
+    }
+    button {
+      cursor: pointer;
+      font-weight: 800;
+      border: none;
+      background: linear-gradient(135deg, #1061ff, #0a8cff);
+      color: white;
+      box-shadow: 0 14px 30px rgba(16,97,255,.2);
+    }
+    button.secondary {
+      background: #eef4ff;
+      color: var(--primary);
+      box-shadow: none;
+      border: 1px solid rgba(16,97,255,.1);
+    }
+    button.ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      box-shadow: none;
+    }
+    .section { margin-top: 18px; }
+    .section-head {
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      margin-bottom: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 18px;
+      background: rgba(255,255,255,.84);
+      border: 1px solid var(--border);
+    }
+    th, td {
+      text-align: left;
+      padding: 14px 12px;
+      border-bottom: 1px solid rgba(16,32,51,.06);
+      vertical-align: top;
+      font-size: 14px;
+    }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .pending { background: rgba(245,158,11,.12); color: #9a6200; }
+    .code_sent, .paid { background: rgba(16,185,129,.12); color: #0d7a53; }
+    .redeemed { background: rgba(16,97,255,.12); color: #0f4ec4; }
+    .failed, .cancelled, .revoked { background: rgba(239,68,68,.12); color: #b42318; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .actions button { min-width: 104px; padding: 10px 12px; box-shadow:none; }
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      background: #102033;
+      color: white;
+      padding: 14px 16px;
+      border-radius: 16px;
+      min-width: 260px;
+      box-shadow: 0 18px 44px rgba(16,32,51,.22);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: all .18s ease;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .subtle { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    @media (max-width: 1024px) {
+      .grid, .toolbar, .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .wrap { padding: 14px; }
+      .grid, .toolbar, .form-grid { grid-template-columns: 1fr; }
+      .topbar, .section-head { flex-direction: column; align-items: stretch; }
+      table, thead, tbody, th, td, tr { display: block; }
+      thead { display: none; }
+      tr { border-bottom: 1px solid rgba(16,32,51,.08); padding: 10px 0; }
+      td { border: none; padding: 8px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <div class="topbar">
+        <div>
+          <div class="pill">MeetingMind Admin</div>
+          <h1 style="margin-top:12px;">Upgrade Operations Console</h1>
+          <p class="muted">Theo doi giao dich VNPAY, tim user, duyet nang cap, resend code va revoke code trong cung mot noi.</p>
+        </div>
+        <form action="/admin/logout" method="post">
+          <button type="submit" class="ghost">Dang xuat</button>
+        </form>
+      </div>
+
+      <div class="grid" id="statsGrid">
+        <div class="stat"><span>Total requests</span><strong>{{ stats.total }}</strong></div>
+        <div class="stat"><span>Paid waiting code</span><strong>{{ stats.paid_waiting_code }}</strong></div>
+        <div class="stat"><span>Codes sent</span><strong>{{ stats.codes_sent }}</strong></div>
+        <div class="stat"><span>Redeemed</span><strong>{{ stats.redeemed }}</strong></div>
+      </div>
+
+      <div class="section panel" style="padding:18px;">
+        <div class="section-head">
+          <div>
+            <h2>Manual transaction / fallback queue</h2>
+            <div class="subtle">Dung de tao giao dich test hoac xu ly thanh toan ngoai VNPAY.</div>
+          </div>
+        </div>
+        <div class="form-grid">
+          <input id="txId" placeholder="Transaction ID" />
+          <input id="userId" placeholder="User ID" />
+          <input id="userEmail" placeholder="User email" />
+          <select id="plan">
+            <option value="plus">plus</option>
+            <option value="premium">premium</option>
+          </select>
+          <input id="amount" type="number" placeholder="Amount" />
+          <input id="provider" value="manual" placeholder="Provider" />
+        </div>
+        <div style="margin-top:12px;">
+          <textarea id="note" placeholder="Ghi chu giao dich"></textarea>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button style="max-width:260px;" onclick="createMock()">Tao giao dich</button>
+          <button style="max-width:180px;" class="secondary" onclick="prefillTx()">Tao ma moi</button>
+        </div>
+      </div>
+
+      <div class="section panel" style="padding:18px;">
+        <div class="section-head">
+          <div>
+            <h2>Tim user nhanh</h2>
+            <div class="subtle">Tim theo user id, email hoac ten. Bam vao ket qua de dien nhanh vao form giao dich ben tren.</div>
+          </div>
+        </div>
+        <div class="toolbar" style="grid-template-columns: 2fr 180px 1fr 1fr 1fr 1fr;">
+          <input id="userSearch" placeholder="Nhap user id, email hoac ten" />
+          <button class="secondary" onclick="searchUsers()">Tim user</button>
+        </div>
+        <div id="userResults" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-head">
+          <div>
+            <h2>Request queue</h2>
+            <div class="subtle">Auto refresh 15 giay. Ban co the loc theo plan, trang thai giao dich va tim theo transaction, user, email, code.</div>
+          </div>
+          <button class="secondary" style="max-width:140px;" onclick="loadRequests()">Refresh</button>
+        </div>
+        <div class="toolbar">
+          <input id="search" placeholder="Search transaction, user, email, code" />
+          <select id="filterPlan">
+            <option value="">All plans</option>
+            <option value="plus">plus</option>
+            <option value="premium">premium</option>
+          </select>
+          <select id="filterStatus">
+            <option value="">All code statuses</option>
+            <option value="pending">pending</option>
+            <option value="code_sent">code_sent</option>
+            <option value="redeemed">redeemed</option>
+            <option value="revoked">revoked</option>
+            <option value="failed">failed</option>
+          </select>
+          <select id="filterPaymentStatus">
+            <option value="">All payment statuses</option>
+            <option value="created">created</option>
+            <option value="pending">pending</option>
+            <option value="paid">paid</option>
+            <option value="failed">failed</option>
+            <option value="cancelled">cancelled</option>
+          </select>
+          <button class="secondary" onclick="loadRequests()">Apply filters</button>
+          <button class="ghost" onclick="clearFilters()">Clear</button>
+        </div>
+        <div style="margin-top:14px; overflow:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Transaction</th>
+                <th>User</th>
+                <th>Plan</th>
+                <th>Payment</th>
+                <th>Code State</th>
+                <th>Code</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="requestsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    let lastPaidWaitingCode = Number({{ stats.paid_waiting_code|tojson }});
+
+    function q(id) { return document.getElementById(id); }
+
+    function prefillTx() {
+      q('txId').value = 'TX-' + Date.now();
+    }
+
+    function showToast(message) {
+      const toast = q('toast');
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    }
+
+    async function api(url, options = {}) {
+      const res = await fetch(url, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Request failed');
+      }
+      return data;
+    }
+
+    async function createMock() {
+      const payload = {
+        transaction_id: q('txId').value.trim(),
+        user_id: q('userId').value.trim(),
+        user_email: q('userEmail').value.trim(),
+        requested_plan: q('plan').value,
+        amount: Number(q('amount').value || 0),
+        payment_provider: q('provider').value.trim() || 'manual',
+        note: q('note').value.trim(),
+      };
+      await api('/admin/api/upgrade-requests/mock', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      prefillTx();
+      q('note').value = '';
+      showToast('Da tao giao dich moi');
+      loadRequests();
+    }
+
+    async function requestAction(id, action, body = {}) {
+      const map = {
+        issue: `/admin/api/upgrade-requests/${id}/issue-code`,
+        resend: `/admin/api/upgrade-requests/${id}/resend-code`,
+        revoke: `/admin/api/upgrade-requests/${id}/revoke-code`,
+      };
+      const data = await api(map[action], {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      showToast(data.message || 'Da xu ly');
+      loadRequests();
+    }
+
+    function badge(value) {
+      const cls = String(value || '').toLowerCase();
+      return `<span class="badge ${cls}">${value || '-'}</span>`;
+    }
+
+    function renderRows(items) {
+      const body = q('requestsBody');
+      if (!items.length) {
+        body.innerHTML = '<tr><td colspan="7">Khong co giao dich phu hop bo loc.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = items.map(item => `
+        <tr>
+          <td>
+            <strong>${item.transaction_id}</strong>
+            <div class="subtle">${item.payment_provider || '-'} • ${item.created_at || ''}</div>
+          </td>
+          <td>
+            <div>${item.user_id}</div>
+            <div class="subtle">${item.user_email || ''}</div>
+          </td>
+          <td><strong>${item.requested_plan}</strong></td>
+          <td>
+            ${badge(item.payment_status)}
+            <div class="subtle">VNPAY code: ${item.vnp_response_code || '-'}</div>
+          </td>
+          <td>${badge(item.status)}</td>
+          <td>
+            <strong>${item.issued_code || '-'}</strong>
+            <div class="subtle">${item.amount || '-'} ${item.currency || ''}</div>
+          </td>
+          <td>
+            <div class="actions">
+              <button onclick="requestAction('${item.id}', 'issue', { approved_by: 'admin-web' })">Issue</button>
+              <button class="secondary" onclick="requestAction('${item.id}', 'resend')">Resend</button>
+              <button class="ghost" onclick="requestAction('${item.id}', 'revoke')">Revoke</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function searchUsers() {
+      const keyword = q('userSearch').value.trim();
+      const container = q('userResults');
+      if (!keyword) {
+        container.innerHTML = '';
+        return;
+      }
+      const data = await api('/admin/api/users/search?q=' + encodeURIComponent(keyword));
+      if (!data.users.length) {
+        container.innerHTML = '<div class="subtle">Khong tim thay user phu hop.</div>';
+        return;
+      }
+      container.innerHTML = data.users.map(user => `
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--border);border-radius:14px;background:white;margin-bottom:10px;">
+          <div>
+            <strong>${user.name || 'Unknown user'}</strong>
+            <div class="subtle">${user.email || ''}</div>
+            <div class="subtle">${user.id} • plan ${user.plan}</div>
+          </div>
+          <button class="secondary" style="max-width:140px;" onclick="useUser('${user.id}', '${(user.email || '').replace(/'/g, "\\'")}')">Dung user nay</button>
+        </div>
+      `).join('');
+    }
+
+    function useUser(id, email) {
+      q('userId').value = id;
+      q('userEmail').value = email;
+      showToast('Da dien user vao form giao dich');
+    }
+
+    function updateStats(stats) {
+      const html = `
+        <div class="stat"><span>Total requests</span><strong>${stats.total}</strong></div>
+        <div class="stat"><span>Paid waiting code</span><strong>${stats.paid_waiting_code}</strong></div>
+        <div class="stat"><span>Codes sent</span><strong>${stats.codes_sent}</strong></div>
+        <div class="stat"><span>Redeemed</span><strong>${stats.redeemed}</strong></div>
+      `;
+      q('statsGrid').innerHTML = html;
+
+      if (stats.paid_waiting_code > lastPaidWaitingCode) {
+        showToast('Co giao dich moi da thanh toan dang cho duyet');
+      }
+      lastPaidWaitingCode = stats.paid_waiting_code;
+    }
+
+    async function loadRequests() {
+      const params = new URLSearchParams({
+        search: q('search').value.trim(),
+        plan: q('filterPlan').value,
+        status: q('filterStatus').value,
+        payment_status: q('filterPaymentStatus').value,
+      });
+      const data = await api('/admin/api/upgrade-requests?' + params.toString());
+      updateStats(data.stats);
+      renderRows(data.requests);
+    }
+
+    function clearFilters() {
+      q('search').value = '';
+      q('filterPlan').value = '';
+      q('filterStatus').value = '';
+      q('filterPaymentStatus').value = '';
+      loadRequests();
+    }
+
+    prefillTx();
+    loadRequests();
+    setInterval(loadRequests, 15000);
+  </script>
+</body>
+</html>

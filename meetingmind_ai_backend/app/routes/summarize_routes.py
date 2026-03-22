@@ -23,7 +23,11 @@ def summarize_sid(sid):
     
     # Kiểm tra xem đã có transcript trong DB chưa
     if not meeting.full_transcript:
-        return jsonify({"error": "No transcript found in database"}), 400
+        return jsonify({
+            "error": "No transcript found in database",
+            "code": "no_transcript",
+            "hint": "Check Speechmatics quota/connection and record audio again."
+        }), 400
 
     # Áp dụng mapping tên người nói (nếu có)
     updated_transcript = apply_speaker_names(meeting.full_transcript, meeting.speaker_names)

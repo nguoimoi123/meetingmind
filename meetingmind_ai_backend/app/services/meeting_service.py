@@ -74,19 +74,17 @@ def update_meeting_meta(sid, title=None, user_id=None):
     if not meeting:
         if not user_id:
             return None
-        meeting = Meeting(
+        meeting = get_or_create_meeting(
             sid=sid,
             user_id=user_id,
-            status="in_progress",
             title=title or "Untitled Meeting",
         )
-        meeting.save()
         return meeting
 
     if title:
-        meeting.title = title
+        Meeting.objects(sid=sid).update_one(set__title=title)
+        meeting = Meeting.objects(sid=sid).first()
 
-    meeting.save()
     return meeting
 
 

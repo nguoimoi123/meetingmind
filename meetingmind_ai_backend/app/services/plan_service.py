@@ -95,5 +95,7 @@ def redeem_upgrade_code(user_id: str, code_value: str):
     code.used_by = str(user.id)
     code.used_at = datetime.utcnow()
     code.save()
+    from ..services.admin_upgrade_service import mark_request_redeemed
+    mark_request_redeemed(code_value, str(user.id))
 
     return user, None
