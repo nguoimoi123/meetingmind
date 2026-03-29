@@ -4,6 +4,7 @@ from google.auth.transport import requests
 import os
 from ..models.user_model import User
 from mongoengine.errors import NotUniqueError
+from ..services.auth_token_service import issue_user_token
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -55,7 +56,8 @@ def google_login():
             "email": email,
             "name": name,
             "avatar": avatar,
-            "plan": user.plan
+            "plan": user.plan,
+            "access_token": issue_user_token(str(user.id)),
         }), 200
 
     except NotUniqueError:

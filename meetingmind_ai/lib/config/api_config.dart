@@ -1,7 +1,11 @@
-/// Centralized API configuration.
-///
-/// For local testing only. Avoid hardcoding production secrets/URLs in apps.
-const String apiBaseUrl = 'http://192.168.0.155:5000';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-/// Derived endpoints.
-const String googleAuthEndpoint = '$apiBaseUrl/auth/google';
+String get apiBaseUrl {
+  final configured = (dotenv.env['API_BASE_URL'] ?? '').trim();
+  if (configured.isNotEmpty) {
+    return configured;
+  }
+  return 'http://localhost:5000';
+}
+
+String get googleAuthEndpoint => '$apiBaseUrl/auth/google';

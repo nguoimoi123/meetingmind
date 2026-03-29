@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class SubscriptionService {
   static Future<String> createVnpayCheckoutUrl({
@@ -9,7 +10,7 @@ class SubscriptionService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/payments/vnpay/create'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'user_id': userId,
         'plan': plan,
@@ -34,7 +35,7 @@ class SubscriptionService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/user/upgrade-code/create'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'plan': plan,
         'count': count,
@@ -60,7 +61,7 @@ class SubscriptionService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/user/upgrade'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'user_id': userId,
         'code': code,

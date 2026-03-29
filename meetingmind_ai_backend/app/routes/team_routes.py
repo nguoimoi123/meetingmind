@@ -13,6 +13,7 @@ from app.services.team_service import (
     accept_invite_by_token,
 )
 from app.models.team_event_model import TeamEvent
+from app.services.authorization_service import require_same_user, require_team_active_member
 
 team_bp = Blueprint("teams", __name__, url_prefix="/teams")
 
@@ -26,6 +27,10 @@ def create_team_route():
     if not owner_id or not name:
         return jsonify({"error": "owner_id and name are required"}), 400
 
+    _, auth_error = require_same_user(request, owner_id)
+    if auth_error:
+        return auth_error
+
     team, error = create_team(owner_id=owner_id, name=name)
     if error:
         return jsonify({"error": error}), 403
@@ -38,6 +43,10 @@ def list_teams_route():
     user_id = request.args.get("user_id")
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
+
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
 
     teams = list_user_teams(user_id)
     return jsonify([
@@ -53,6 +62,14 @@ def list_teams_route():
 
 @team_bp.route("/<team_id>/members", methods=["GET"])
 def list_members_route(team_id):
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    _, _, auth_error = require_team_active_member(request, team_id, user_id)
+    if auth_error:
+        return auth_error
+
     members = list_team_members(team_id)
     return jsonify([
         {
@@ -73,6 +90,10 @@ def invite_member_route(team_id):
 
     if not owner_id or (not member_id and not member_email):
         return jsonify({"error": "owner_id and member_id/member_email are required"}), 400
+
+    _, auth_error = require_same_user(request, owner_id)
+    if auth_error:
+        return auth_error
 
     member, error = invite_member(
         team_id=team_id,
@@ -96,6 +117,10 @@ def list_invites_route():
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
 
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
+
     invites = list_user_invites(user_id)
     return jsonify(invites), 200
 
@@ -107,6 +132,10 @@ def accept_invite_route(team_id):
 
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
+
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
 
     member, error, plan_changed, plan = accept_invite(team_id=team_id, user_id=user_id)
     if error:
@@ -131,6 +160,11 @@ def accept_invite_by_token_route():
     if not token:
         return jsonify({"error": "token is required"}), 400
 
+    if user_id:
+        _, auth_error = require_same_user(request, user_id)
+        if auth_error:
+            return auth_error
+
     result, error = accept_invite_by_token(token=token, user_id=user_id, email=email)
     if error:
         return jsonify({"error": error}), 403
@@ -147,6 +181,10 @@ def create_team_event_route(team_id):
 
     if not creator_id or not title:
         return jsonify({"error": "creator_id and title are required"}), 400
+
+    _, auth_error = require_same_user(request, creator_id)
+    if auth_error:
+        return auth_error
 
     try:
         start_time = datetime.fromisoformat(data.get("start_time").replace("Z", "+00:00"))
@@ -177,6 +215,14 @@ def create_team_event_route(team_id):
 
 @team_bp.route("/<team_id>/events", methods=["GET"])
 def list_team_events_route(team_id):
+    user_id = request.args.get("user_id")
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+
+    _, _, auth_error = require_team_active_member(request, team_id, user_id)
+    if auth_error:
+        return auth_error
+
     events = TeamEvent.objects(team_id=team_id).order_by("-start_time")
     return jsonify([
         {
@@ -199,6 +245,10 @@ def remove_member_route(team_id, member_id):
     if not owner_id:
         return jsonify({"error": "owner_id is required"}), 400
 
+    _, auth_error = require_same_user(request, owner_id)
+    if auth_error:
+        return auth_error
+
     ok, error = remove_member(team_id=team_id, owner_id=owner_id, member_id=member_id)
     if error:
         return jsonify({"error": error}), 403
@@ -213,6 +263,10 @@ def delete_team_route(team_id):
 
     if not owner_id:
         return jsonify({"error": "owner_id is required"}), 400
+
+    _, auth_error = require_same_user(request, owner_id)
+    if auth_error:
+        return auth_error
 
     ok, error = delete_team(team_id=team_id, owner_id=owner_id)
     if error:

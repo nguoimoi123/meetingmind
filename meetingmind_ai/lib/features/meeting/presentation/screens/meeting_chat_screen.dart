@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:meetingmind_ai/providers/auth_provider.dart';
 import 'package:meetingmind_ai/services/chat_meeting_service.dart';
+import 'package:provider/provider.dart';
 
 class MeetingChatScreen extends StatefulWidget {
   final String meetingSid;
@@ -12,12 +14,19 @@ class MeetingChatScreen extends StatefulWidget {
 class _MeetingChatScreenState extends State<MeetingChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final ChatService _chatService = ChatService();
+  late final ChatService _chatService;
   final List<Map<String, String>> _messages = [];
   bool _isLoading = false;
 
   // Màu sắc nổi bật cho AI và Nút gửi (Vibrant Blue)
   static const Color _aiAccentColor = Color(0xFF2962FF);
+
+  @override
+  void initState() {
+    super.initState();
+    final userId = context.read<AuthProvider>().userId ?? '';
+    _chatService = ChatService(userId: userId);
+  }
 
   void _sendMessage() async {
     if (_textController.text.trim().isEmpty) return;

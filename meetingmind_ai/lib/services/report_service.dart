@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class ReportService {
   static Future<String> exportMarkdown({
@@ -12,7 +13,7 @@ class ReportService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/report/markdown'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'title': title,
         'summary': summary,
@@ -38,7 +39,7 @@ class ReportService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/report/pdf'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'title': title,
         'summary': summary,

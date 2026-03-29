@@ -71,7 +71,7 @@ class _MeetingSetupScreenState extends State<MeetingSetupScreen> {
     }
   }
 
-  void _startMeeting() {
+  Future<void> _startMeeting() async {
     if (_titleController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -100,22 +100,32 @@ class _MeetingSetupScreenState extends State<MeetingSetupScreen> {
 
     setState(() => _isLoading = true);
 
-    // Simulate upload delay
-    Future.delayed(const Duration(seconds: 1), () {
+    try {
+      await Future.delayed(const Duration(milliseconds: 350));
+      if (!mounted) return;
+      await context.push('/in_meeting', extra: {
+        'title': _titleController.text.trim(),
+        'filePath': _selectedFile?.path,
+        'aiAgentEnabled': _aiAgentEnabled,
+        'openAiKey': effectiveKey.isEmpty ? null : effectiveKey,
+      });
+    } finally {
       if (mounted) {
-        // Pass meeting title and file path to in_meeting_screen
-        context.push('/in_meeting', extra: {
-          'title': _titleController.text.trim(),
-          'filePath': _selectedFile?.path,
-          'aiAgentEnabled': _aiAgentEnabled,
-          'openAiKey': effectiveKey.isEmpty ? null : effectiveKey,
-        });
+        setState(() => _isLoading = false);
       }
-    });
+    }
   }
 
   void _clearFile() {
     setState(() => _selectedFile = null);
+  }
+
+  double _safeFileSizeInMb(File file) {
+    try {
+      return file.lengthSync() / 1024 / 1024;
+    } catch (_) {
+      return 0;
+    }
   }
 
   @override
@@ -305,7 +315,7 @@ class _MeetingSetupScreenState extends State<MeetingSetupScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${(_selectedFile!.lengthSync() / 1024 / 1024).toStringAsFixed(2)} MB',
+                            '${_safeFileSizeInMb(_selectedFile!).toStringAsFixed(2)} MB',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                             ),

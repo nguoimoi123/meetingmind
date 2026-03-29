@@ -3,12 +3,22 @@ from io import BytesIO
 from docx import Document
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from app.services.authorization_service import get_authenticated_user_id
 
 report_bp = Blueprint("report", __name__, url_prefix="/report")
 
 
+def _require_auth():
+    _, auth_error = get_authenticated_user_id(request)
+    return auth_error
+
+
 @report_bp.route("/docx", methods=["POST"])
 def export_docx():
+    auth_error = _require_auth()
+    if auth_error:
+        return auth_error
+
     data = request.get_json() or {}
     title = data.get("title") or "Meeting Report"
     summary = data.get("summary") or ""
@@ -54,6 +64,10 @@ def export_docx():
 
 @report_bp.route("/markdown", methods=["POST"])
 def export_markdown():
+    auth_error = _require_auth()
+    if auth_error:
+        return auth_error
+
     data = request.get_json() or {}
     title = data.get("title") or "Meeting Report"
     summary = data.get("summary") or ""
@@ -90,6 +104,10 @@ def export_markdown():
 
 @report_bp.route("/pdf", methods=["POST"])
 def export_pdf():
+    auth_error = _require_auth()
+    if auth_error:
+        return auth_error
+
     data = request.get_json() or {}
     title = data.get("title") or "Meeting Report"
     summary = data.get("summary") or ""

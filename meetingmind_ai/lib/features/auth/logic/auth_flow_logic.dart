@@ -27,6 +27,7 @@ class AuthFlowLogic {
           email: data['email']?.toString(),
           name: data['name']?.toString(),
           plan: data['plan']?.toString(),
+          accessToken: data['access_token']?.toString(),
         );
 
     if (context.mounted) {
@@ -53,6 +54,7 @@ class AuthFlowLogic {
           email: data['email']?.toString(),
           name: data['name']?.toString(),
           plan: data['plan']?.toString(),
+          accessToken: data['access_token']?.toString(),
         );
 
     if (context.mounted) {
@@ -80,6 +82,7 @@ class AuthFlowLogic {
           user: await GoogleSignIn().signInSilently(),
           userIdFromBackend: data['user_id']?.toString() ?? '',
           plan: data['plan']?.toString(),
+          accessToken: data['access_token']?.toString(),
         );
 
     if (context.mounted) {

@@ -45,9 +45,11 @@ def create_app():
         origin = request.headers.get("Origin") or "*"
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Headers"] = (
-            "Content-Type, X-Admin-Key, X-Webhook-Secret"
+            "Authorization, Content-Type, X-Admin-Key, X-Webhook-Secret"
         )
-        response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+        response.headers["Access-Control-Allow-Methods"] = (
+            "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        )
         response.headers["Vary"] = "Origin"
         return response
 

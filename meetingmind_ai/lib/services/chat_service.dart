@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class ChatService {
   static Future<String> ask({
@@ -11,7 +12,7 @@ class ChatService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/chat/notebook'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'user_id': userId,
         'folder_id': folderId,

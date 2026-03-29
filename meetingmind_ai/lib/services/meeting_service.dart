@@ -1,18 +1,23 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+
 import '../config/api_config.dart';
 import '../models/meeting_models.dart';
+import 'api_auth_headers.dart';
 
 class MeetingService {
   IO.Socket get socket => _socket!;
   String? meetingSid;
   String? meetingTitle;
   String? contextFileContent;
+  String _accessToken = '';
 
-  static const String _serverUrl = apiBaseUrl;
+  static String get _serverUrl => apiBaseUrl;
 
   IO.Socket? _socket;
   final StreamController<TranscriptMessage> _transcriptController =
@@ -30,29 +35,34 @@ class MeetingService {
       _transcriptController.stream;
   Stream<String> get statusStream => _statusController.stream;
   bool get isRecording => _isRecording;
+  String? get currentMeetingSid => meetingSid ?? _socket?.id;
 
   Future<void> connect() async {
-    if (_socket != null && _socket!.connected) return;
+    if (_socket != null && _socket!.connected) {
+      meetingSid = currentMeetingSid;
+      return;
+    }
 
-    print("Connecting to $_serverUrl...");
+    print('Connecting to $_serverUrl...');
 
     final completer = Completer<void>();
+    final prefs = await SharedPreferences.getInstance();
+    _accessToken = prefs.getString('accessToken') ?? '';
 
-    // Truyền user_id vào query params khi connect
     _socket = IO.io(_serverUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
-      'query': {'user_id': userId},
+      'query': {
+        'user_id': userId,
+        if (_accessToken.isNotEmpty) 'access_token': _accessToken,
+      },
     });
 
-    _socket!.connect();
-
     _socket!.on('connect', (_) {
-      meetingSid = socket.id;
-      print("🆔 Socket SID = $meetingSid");
+      meetingSid = currentMeetingSid;
+      print('Socket SID = $meetingSid');
       print('Connected to Server');
       _statusController.add('Connected');
-      _syncMeetingMeta();
       if (!completer.isCompleted) {
         completer.complete();
       }
@@ -64,12 +74,29 @@ class MeetingService {
     });
 
     _socket!.on('status', (data) {
-      print('Server Status: ${data['msg']}');
+      final msg = (data is Map && data['msg'] != null)
+          ? data['msg'].toString()
+          : data.toString();
+      print('Server Status: $msg');
+      if (msg.toLowerCase().contains('unauthorized') ||
+          msg.toLowerCase().contains('limit')) {
+        _isRecording = false;
+      }
+      _statusController.add(msg);
     });
 
     _socket!.on('transcript_response', (data) {
-      TranscriptMessage msg = TranscriptMessage.fromJson(data);
-      _transcriptController.add(msg);
+      if (data is Map<String, dynamic>) {
+        final msg = TranscriptMessage.fromJson(data);
+        _transcriptController.add(msg);
+        return;
+      }
+      if (data is Map) {
+        final msg = TranscriptMessage.fromJson(
+          data.map((key, value) => MapEntry(key.toString(), value)),
+        );
+        _transcriptController.add(msg);
+      }
     });
 
     _socket!.on('error', (error) {
@@ -79,7 +106,17 @@ class MeetingService {
       }
     });
 
-    await completer.future;
+    _socket!.connect();
+
+    try {
+      await completer.future.timeout(const Duration(seconds: 8));
+    } on TimeoutException {
+      if (_socket?.connected == true) {
+        meetingSid = currentMeetingSid;
+      } else {
+        rethrow;
+      }
+    }
   }
 
   void disconnect() {
@@ -89,17 +126,22 @@ class MeetingService {
   }
 
   void startStreaming({String? title}) {
+    final payload = <String, dynamic>{'user_id': userId};
     final payloadTitle = (title ?? meetingTitle)?.trim();
     if (payloadTitle != null && payloadTitle.isNotEmpty) {
-      _socket?.emit('start_streaming', {
-        'title': payloadTitle,
-        'user_id': userId,
-      });
-    } else {
-      _socket?.emit('start_streaming', {'user_id': userId});
+      meetingTitle = payloadTitle;
+      payload['title'] = payloadTitle;
     }
+    if (_accessToken.isNotEmpty) {
+      payload['access_token'] = _accessToken;
+    }
+    _socket?.emit('start_streaming', payload);
     _isRecording = true;
     _statusController.add('Recording started');
+    Future<void>.delayed(
+      const Duration(milliseconds: 250),
+      _syncMeetingMeta,
+    );
   }
 
   void sendAudioData(List<int> bytes) {
@@ -123,42 +165,63 @@ class MeetingService {
     }
   }
 
-  Future<void> setMeetingContext(
-      {required String title, String? context}) async {
+  Future<void> setMeetingContext({
+    required String title,
+    String? context,
+  }) async {
     meetingTitle = title;
     contextFileContent = context;
     await _syncMeetingMeta();
   }
 
   Future<void> _syncMeetingMeta() async {
-    if (meetingSid == null || meetingTitle == null) return;
-    final uri = Uri.parse('$_serverUrl/meetings/$meetingSid?user_id=$userId');
+    final sid = currentMeetingSid;
+    if (sid == null || meetingTitle == null) return;
+    final uri = Uri.parse('$_serverUrl/meetings/$sid?user_id=$userId');
     try {
       final response = await http.put(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: await ApiAuthHeaders.build(json: true),
         body: jsonEncode({'title': meetingTitle}),
       );
       if (response.statusCode != 200) {
-        print("Failed to sync meeting meta: ${response.statusCode}");
+        print('Failed to sync meeting meta: ${response.statusCode}');
       }
     } catch (e) {
-      print("Error syncing meeting meta: $e");
+      print('Error syncing meeting meta: $e');
     }
   }
 
-  // API: lấy danh sách cuộc họp
+  Future<String?> waitForMeetingSid({
+    Duration timeout = const Duration(seconds: 2),
+  }) async {
+    final startedAt = DateTime.now();
+    while (DateTime.now().difference(startedAt) < timeout) {
+      final sid = currentMeetingSid;
+      if (sid != null && sid.isNotEmpty) {
+        meetingSid = sid;
+        return sid;
+      }
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    return currentMeetingSid;
+  }
+
   Future<List<Meeting>> getPastMeetings() async {
     final uri = Uri.parse('$_serverUrl/meetings?user_id=$userId');
 
     try {
-      final response = await http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            uri,
+            headers: await ApiAuthHeaders.build(),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        List<dynamic> data = json.decode(response.body);
+        final data = json.decode(response.body) as List<dynamic>;
         return data.map((json) {
           final createdAt = DateTime.parse(json['created_at']);
-
           return Meeting(
             id: json['id'],
             title: json['title'],
@@ -173,21 +236,11 @@ class MeetingService {
             tags: List<String>.from(json['tags'] ?? []),
           );
         }).toList();
-      } else {
-        throw Exception('Server Error');
       }
+      throw Exception('Server Error');
     } catch (e) {
-      print("Error fetching meetings: $e");
+      print('Error fetching meetings: $e');
       return [];
-    }
-  }
-
-  String _formatDate(String isoDate) {
-    try {
-      DateTime date = DateTime.parse(isoDate);
-      return "${date.day}/${date.month}/${date.year}";
-    } catch (e) {
-      return "Unknown";
     }
   }
 
@@ -195,14 +248,18 @@ class MeetingService {
     final uri = Uri.parse('$_serverUrl/meetings/$sid');
 
     try {
-      final response =
-          await http.delete(uri).timeout(const Duration(seconds: 10));
+      final response = await http
+          .delete(
+            uri,
+            headers: await ApiAuthHeaders.build(),
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) {
         throw Exception('Failed to delete meeting');
       }
     } catch (e) {
-      print("Error deleting meeting: $e");
-      throw e;
+      print('Error deleting meeting: $e');
+      rethrow;
     }
   }
 }

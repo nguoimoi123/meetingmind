@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from app.services.reminder_service import ReminderController
+from app.services.authorization_service import require_reminder_owner, require_same_user
 
 reminder_bp = Blueprint("reminder", __name__, url_prefix="/reminder")
 
@@ -22,6 +23,10 @@ def create_reminder():
     except Exception:
         return jsonify({"error": "Invalid datetime format"}), 400
 
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
+
     result, status_code = ReminderController.create_reminder(
         user_id=user_id,
         title=title,
@@ -40,6 +45,10 @@ def get_reminder_by_day():
     if not user_id or not date_str:
         return {"error": "user_id and date are required"}, 400
 
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
+
     try:
         date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
@@ -54,4 +63,7 @@ def get_reminder_by_day():
 
 @reminder_bp.route('/delete/<reminder_id>', methods=['DELETE'])
 def delete_reminder(reminder_id):
+    _, _, auth_error = require_reminder_owner(request, reminder_id)
+    if auth_error:
+        return auth_error
     return ReminderController.delete_reminder(reminder_id)

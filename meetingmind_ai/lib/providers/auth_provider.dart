@@ -11,6 +11,7 @@ class AuthProvider extends ChangeNotifier {
   String? _userId;
   String? _email;
   String? _name;
+  String? _accessToken;
   String _plan = 'free';
   Map<String, dynamic> _limits = {};
 
@@ -22,6 +23,7 @@ class AuthProvider extends ChangeNotifier {
   String? get userId => _userId;
   String? get email => _email;
   String? get name => _name;
+  String? get accessToken => _accessToken;
   String get plan => _plan;
   Map<String, dynamic> get limits => _limits;
 
@@ -38,6 +40,7 @@ class AuthProvider extends ChangeNotifier {
     _userId = _prefs!.getString('userId');
     _email = _prefs!.getString('email');
     _name = _prefs!.getString('name');
+    _accessToken = _prefs!.getString('accessToken');
     _plan = _prefs!.getString('plan') ?? 'free';
     final limitsRaw = _prefs!.getString('plan_limits');
     if (limitsRaw != null && limitsRaw.isNotEmpty) {
@@ -62,11 +65,13 @@ class AuthProvider extends ChangeNotifier {
     required GoogleSignInAccount? user,
     required String userIdFromBackend,
     String? plan,
+    String? accessToken,
   }) async {
     _googleUser = user;
     _userId = userIdFromBackend;
     _email = user?.email;
     _name = user?.displayName;
+    _accessToken = accessToken;
     _plan = plan ?? _plan;
     _isLoggedIn = true;
 
@@ -97,11 +102,13 @@ class AuthProvider extends ChangeNotifier {
     String? email,
     String? name,
     String? plan,
+    String? accessToken,
   }) async {
     _googleUser = null;
     _userId = userId;
     _email = email;
     _name = name;
+    _accessToken = accessToken;
     _plan = plan ?? _plan;
     _isLoggedIn = true;
 
@@ -121,6 +128,7 @@ class AuthProvider extends ChangeNotifier {
     _userId = null;
     _email = null;
     _name = null;
+    _accessToken = null;
     _plan = 'free';
     _limits = {};
     _isLoggedIn = false;
@@ -136,6 +144,7 @@ class AuthProvider extends ChangeNotifier {
       await _prefs!.setString('userId', _userId ?? "");
       await _prefs!.setString('email', _email ?? "");
       await _prefs!.setString('name', _name ?? "");
+      await _prefs!.setString('accessToken', _accessToken ?? "");
       await _prefs!.setString('plan', _plan);
       await _prefs!.setString('plan_limits', jsonEncode(_limits));
       // Bạn có thể lưu thêm tên, email nếu cần

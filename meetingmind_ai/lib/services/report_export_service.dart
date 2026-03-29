@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class ReportExportService {
-  static const String _baseUrl = apiBaseUrl;
+  static String get _baseUrl => apiBaseUrl;
 
   static Future<Uint8List> generateDocxBytes({
     required String title,
@@ -18,7 +19,7 @@ class ReportExportService {
     final response = await http
         .post(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: await ApiAuthHeaders.build(json: true),
           body: jsonEncode({
             'title': title,
             'summary': summary,
@@ -47,7 +48,7 @@ class ReportExportService {
     final response = await http
         .post(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: await ApiAuthHeaders.build(json: true),
           body: jsonEncode({
             'user_id': userId,
             'folder_id': folderId,

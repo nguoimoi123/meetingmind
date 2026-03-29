@@ -1,18 +1,19 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class UserService {
-  // ignore: constant_identifier_names
-  static final String? BASE_URL = dotenv.env['API_BASE_URL'];
-
-  /// Lấy thông tin user
   static Future<Map<String, dynamic>> getUserInfo(String userId) async {
-    final res = await http.get(Uri.parse('$BASE_URL/user/$userId'));
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/user/$userId'),
+      headers: await ApiAuthHeaders.build(),
+    );
     if (res.statusCode == 200) {
-      return json.decode(res.body);
-    } else {
-      throw Exception('Failed to load user info');
+      return json.decode(res.body) as Map<String, dynamic>;
     }
+    throw Exception('Failed to load user info');
   }
 }

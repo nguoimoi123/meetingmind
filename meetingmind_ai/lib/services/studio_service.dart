@@ -1,13 +1,14 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class StudioService {
   /// Gọi API generate audio từ folder
   static Future<Map<String, dynamic>> generateAudio(String folderId, String userId) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/tts_studio/generate_audio/$folderId'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({'user_id': userId}),
     );
 
@@ -25,6 +26,7 @@ class StudioService {
   static Future<List<Map<String, dynamic>>> getResultsByFolder(String folderId) async {
     final res = await http.get(
       Uri.parse('$apiBaseUrl/studio_result/folder/$folderId'),
+      headers: await ApiAuthHeaders.build(),
     );
 
     if (res.statusCode == 200) {
@@ -39,6 +41,7 @@ class StudioService {
   static Future<void> deleteResult(String resultId) async {
     final res = await http.delete(
       Uri.parse('$apiBaseUrl/studio_result/delete/$resultId'),
+      headers: await ApiAuthHeaders.build(),
     );
 
     if (res.statusCode != 200) {

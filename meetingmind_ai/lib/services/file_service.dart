@@ -3,11 +3,15 @@ import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:typed_data';
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class FileService {
   /// Lấy folder + danh sách file
   static Future<Map<String, dynamic>> getFolder(String folderId) async {
-    final res = await http.get(Uri.parse('$apiBaseUrl/file/folder/$folderId'));
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/file/folder/$folderId'),
+      headers: await ApiAuthHeaders.build(),
+    );
     if (res.statusCode == 200) {
       return json.decode(res.body);
     } else {
@@ -24,7 +28,7 @@ class FileService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/file/upload'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'user_id': userId,
         'folder_id': folderId,
@@ -44,14 +48,20 @@ class FileService {
   }
 
   static Future<void> deleteFile(String fileId) async {
-    final res = await http.delete(Uri.parse('$apiBaseUrl/file/delete/$fileId'));
+    final res = await http.delete(
+      Uri.parse('$apiBaseUrl/file/delete/$fileId'),
+      headers: await ApiAuthHeaders.build(),
+    );
     if (res.statusCode != 200) {
       throw Exception('Delete failed');
     }
   }
 
   static Future<Uint8List> downloadFile(String fileId) async {
-    final res = await http.get(Uri.parse('$apiBaseUrl/file/download/$fileId'));
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/file/download/$fileId'),
+      headers: await ApiAuthHeaders.build(),
+    );
     if (res.statusCode != 200) {
       throw Exception('Download failed');
     }

@@ -27,7 +27,8 @@ class MeetingTranscriptMessage extends StatelessWidget {
     final displayName = speakerNames[message.speaker] ?? message.speaker;
     final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '?';
     final speakerIndex = speakerNames.keys.toList().indexOf(message.speaker);
-    final avatarColor = speakerColors[speakerIndex % speakerColors.length];
+    final safeSpeakerIndex = speakerIndex >= 0 ? speakerIndex : 0;
+    final avatarColor = speakerColors[safeSpeakerIndex % speakerColors.length];
     final isQuestionBubble = aiEnabled && !isAi && isQuestion(message.text);
 
     final bubble = Container(

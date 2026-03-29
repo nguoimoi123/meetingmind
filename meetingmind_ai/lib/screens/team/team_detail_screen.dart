@@ -31,10 +31,19 @@ class _TeamDetailScreenState extends State<TeamDetailScreen> {
     });
 
     try {
-      final members = await TeamService.listMembers(teamId: widget.teamId);
-      final events = await TeamService.listTeamEvents(teamId: widget.teamId);
+      final userId = context.read<AuthProvider>().userId;
+      if (userId == null || userId.isEmpty) {
+        throw Exception('Missing user session');
+      }
+      final members = await TeamService.listMembers(
+        teamId: widget.teamId,
+        userId: userId,
+      );
+      final events = await TeamService.listTeamEvents(
+        teamId: widget.teamId,
+        userId: userId,
+      );
       if (mounted) {
-        final userId = context.read<AuthProvider>().userId;
         final owner = members
             .cast<Map<String, dynamic>>()
             .firstWhere((m) => m['role'] == 'owner', orElse: () => {});

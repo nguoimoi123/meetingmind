@@ -1,10 +1,16 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
+
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class TeamService {
   static Future<List<dynamic>> listTeams({required String userId}) async {
-    final res = await http.get(Uri.parse('$apiBaseUrl/teams?user_id=$userId'));
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/teams?user_id=$userId'),
+      headers: await ApiAuthHeaders.build(),
+    );
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List<dynamic>;
     }
@@ -17,7 +23,7 @@ class TeamService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/teams/create'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({'owner_id': ownerId, 'name': name}),
     );
 
@@ -29,8 +35,14 @@ class TeamService {
     throw Exception(body['error']?.toString() ?? 'Failed to create team');
   }
 
-  static Future<List<dynamic>> listMembers({required String teamId}) async {
-    final res = await http.get(Uri.parse('$apiBaseUrl/teams/$teamId/members'));
+  static Future<List<dynamic>> listMembers({
+    required String teamId,
+    required String userId,
+  }) async {
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/teams/$teamId/members?user_id=$userId'),
+      headers: await ApiAuthHeaders.build(),
+    );
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List<dynamic>;
     }
@@ -45,7 +57,7 @@ class TeamService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/teams/$teamId/invite'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'owner_id': ownerId,
         if (memberId != null) 'member_id': memberId,
@@ -65,7 +77,7 @@ class TeamService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/teams/$teamId/accept'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({'user_id': userId}),
     );
 
@@ -78,8 +90,10 @@ class TeamService {
   }
 
   static Future<List<dynamic>> listInvites({required String userId}) async {
-    final res =
-        await http.get(Uri.parse('$apiBaseUrl/teams/invites?user_id=$userId'));
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/teams/invites?user_id=$userId'),
+      headers: await ApiAuthHeaders.build(),
+    );
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List<dynamic>;
     }
@@ -93,7 +107,7 @@ class TeamService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/teams/invites/accept'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'token': token,
         if (userId != null) 'user_id': userId,
@@ -119,7 +133,7 @@ class TeamService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/teams/$teamId/events'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({
         'creator_id': creatorId,
         'title': title,
@@ -139,8 +153,12 @@ class TeamService {
 
   static Future<List<dynamic>> listTeamEvents({
     required String teamId,
+    required String userId,
   }) async {
-    final res = await http.get(Uri.parse('$apiBaseUrl/teams/$teamId/events'));
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/teams/$teamId/events?user_id=$userId'),
+      headers: await ApiAuthHeaders.build(),
+    );
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List<dynamic>;
     }
@@ -154,7 +172,7 @@ class TeamService {
   }) async {
     final res = await http.delete(
       Uri.parse('$apiBaseUrl/teams/$teamId/members/$memberId'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({'owner_id': ownerId}),
     );
 
@@ -170,7 +188,7 @@ class TeamService {
   }) async {
     final res = await http.delete(
       Uri.parse('$apiBaseUrl/teams/$teamId'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({'owner_id': ownerId}),
     );
 

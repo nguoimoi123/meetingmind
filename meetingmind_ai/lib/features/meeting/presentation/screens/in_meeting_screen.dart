@@ -44,8 +44,10 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   Map<String, dynamic> _limits = {};
   bool get _aiEnabled =>
       widget.aiAgentEnabled &&
-      (PlanLimits.aiAgentAllowedFromLimits(_limits) || _plan != 'free');
-  bool get _premiumAgentEnabled => InMeetingLogic.isPremiumInMeetingAgentEnabled(
+      (PlanLimits.aiAgentAllowedFromLimits(_limits) ||
+          PlanLimits.aiAgentAllowed(_plan));
+  bool get _premiumAgentEnabled =>
+      InMeetingLogic.isPremiumInMeetingAgentEnabled(
         aiAgentEnabled: widget.aiAgentEnabled,
         plan: _plan,
         limits: _limits,
@@ -60,6 +62,8 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   final ScrollController _scrollController = ScrollController();
 
   StreamSubscription? _audioStreamSubscription;
+  StreamSubscription<TranscriptMessage>? _transcriptStreamSubscription;
+  StreamSubscription<String>? _statusStreamSubscription;
   bool _isRecording = false;
   bool _isPaused = false;
   bool _isDialogOpen = false;
@@ -70,9 +74,11 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   Timer? _premiumAgentDebounce;
   bool _hasInitialized = false;
   final Set<String> _premiumHandledMessages = {};
+  bool _scrollScheduled = false;
 
   // Animation cho hiệu ứng thu âm
   late AnimationController _pulseController;
+  // ignore: unused_field
   late Animation<double> _pulseAnimation;
 
   // Màu sắc rực rỡ cho speaker
@@ -174,6 +180,8 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   void dispose() {
     _meetingLimitTimer?.cancel();
     _premiumAgentDebounce?.cancel();
+    _statusStreamSubscription?.cancel();
+    _transcriptStreamSubscription?.cancel();
     _pulseController.dispose();
     _scrollController.dispose();
     _askController.dispose();
@@ -187,7 +195,42 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     // Đặt title/context trước khi connect để server nhận meta ngay khi kết nối
     await _readContextFile();
 
-    await _meetingService.connect();
+    try {
+      await _meetingService.connect();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Không thể kết nối cuộc họp. Vui lòng thử lại.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+    _statusStreamSubscription?.cancel();
+    _statusStreamSubscription = _meetingService.statusStream.listen((status) {
+      if (!mounted) return;
+
+      final normalized = status.toLowerCase();
+      if (normalized.contains('unauthorized')) {
+        _stopRecording();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else if (normalized.contains('meeting limit')) {
+        _stopRecording();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(status),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
     _meetingService.startStreaming(title: _meetingTitle);
 
     final limitMinutes = PlanLimits.meetingDurationMinutesFromLimits(_limits) ??
@@ -207,39 +250,57 @@ class _InMeetingScreenState extends State<InMeetingScreen>
       });
     }
 
-    _meetingService.transcriptStream.listen((TranscriptMessage message) {
+    _transcriptStreamSubscription?.cancel();
+    _transcriptStreamSubscription =
+        _meetingService.transcriptStream.listen((TranscriptMessage message) {
       print("📥 Nhận: ${message.speaker}: ${message.text}");
-      if (!message.isFinal) return;
+      if (!mounted) return;
 
-      if (mounted) {
-        setState(() {
-          String speakerId = message.speaker;
-          if (!_speakerNames.containsKey(speakerId)) {
-            if (!_isDialogOpen) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _showSpeakerNameDialog(speakerId);
-              });
-            }
+      setState(() {
+        if (!message.isFinal) {
+          final partialIndex = _messages.lastIndexWhere(
+            (m) => !m.isFinal && m.speaker == message.speaker,
+          );
+          if (partialIndex >= 0) {
+            _messages[partialIndex] = message;
+          } else {
+            _messages.add(message);
           }
-          _messages.add(message);
-        });
-        _scrollToBottom();
-        _maybeTriggerPremiumAgent(message);
-      }
+          return;
+        }
+
+        _messages
+            .removeWhere((m) => !m.isFinal && m.speaker == message.speaker);
+
+        // Do not auto-open speaker dialog during live transcript to avoid UI lock.
+        _messages.add(message);
+      });
+      _scrollToBottom();
     });
 
     await _startRecording();
   }
 
   void _scrollToBottom() {
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+    if (_scrollScheduled) return;
+    _scrollScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollScheduled = false;
+      if (!mounted || !_scrollController.hasClients) return;
+      final position = _scrollController.position;
+      if (!position.hasContentDimensions) return;
+      final max = position.maxScrollExtent;
+      if (!max.isFinite) return;
+      final delta = (max - position.pixels).abs();
+      if (delta < 24) {
+        _scrollController.jumpTo(max);
+        return;
       }
+      _scrollController.animateTo(
+        max,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
     });
   }
 
@@ -251,6 +312,33 @@ class _InMeetingScreenState extends State<InMeetingScreen>
           r'^(who|what|when|where|why|how|which|can|could|should|would|do|does|did|is|are|am|will)\b',
           caseSensitive: false,
         ).hasMatch(trimmed);
+  }
+
+  String _sanitizeAiAnswer(String text) {
+    return text
+        .replaceAll(RegExp(r'```[\s\S]*?```'), '')
+        .replaceAll('**', '')
+        .replaceAll('*', '')
+        .replaceAll('`', '')
+        .replaceAll(RegExp(r'(?m)^\s*#{1,6}\s*'), '')
+        .replaceAll(RegExp(r'(?m)^\s*[-•]+\s*'), '')
+        .replaceAll(RegExp(r'(?m)^\s*//+\s*'), '')
+        .replaceAll(RegExp(r'(?m)^\s*\d+\.\s+'), '')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
+  }
+
+  bool _shouldShowAiAnswerPrompt(TranscriptMessage message) {
+    if (!_aiEnabled || !message.isFinal || message.speaker == 'AI Agent') {
+      return false;
+    }
+
+    final key = InMeetingLogic.buildMessageKey(message);
+    if (_premiumHandledMessages.contains(key)) {
+      return false;
+    }
+
+    return _isQuestionText(message.text);
   }
 
   void _maybeTriggerPremiumAgent(TranscriptMessage message) {
@@ -443,7 +531,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     if (content == null || content.isEmpty) {
       throw Exception('OpenAI returned empty content');
     }
-    return content;
+    return _sanitizeAiAnswer(content);
   }
 
   Future<String> _askPremiumOpenAi({
@@ -460,7 +548,8 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     final uri = Uri.parse('https://api.openai.com/v1/chat/completions');
     final systemPrompt = InMeetingLogic.buildPremiumSystemPrompt(
       meetingTitle: _meetingTitle,
-      hasDocumentContext: _contextText != null && _contextText!.trim().isNotEmpty,
+      hasDocumentContext:
+          _contextText != null && _contextText!.trim().isNotEmpty,
     );
     final userPrompt = [
       if (speakerName != null && speakerName.isNotEmpty)
@@ -501,7 +590,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     if (content == null || content.isEmpty) {
       throw Exception('OpenAI returned empty content');
     }
-    return content;
+    return _sanitizeAiAnswer(content);
   }
 
   Future<String> _resolveAiAnswer({
@@ -576,11 +665,68 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     if (mounted) setState(() => _isAskingAi = false);
   }
 
+  Future<void> _askAiForTranscriptMessage(TranscriptMessage message) async {
+    final key = InMeetingLogic.buildMessageKey(message);
+    if (_isAskingAi || _premiumHandledMessages.contains(key)) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isAskingAi = true;
+        _premiumHandledMessages.add(key);
+      });
+    }
+
+    try {
+      final combinedContext = InMeetingLogic.buildCombinedContext(
+        documentContext: _contextText,
+        messages: _messages,
+        speakerNames: _speakerNames,
+        preferRecentTranscript: _premiumAgentEnabled,
+      );
+      final answer = await _resolveAiAnswer(
+        question: message.text,
+        combinedContext: combinedContext,
+        allowGeneralKnowledge: _premiumAgentEnabled,
+        speakerName: _speakerNames[message.speaker] ?? message.speaker,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _messages.add(
+          TranscriptMessage(
+            speaker: 'AI Agent',
+            text: answer,
+            isFinal: true,
+          ),
+        );
+      });
+      _scrollToBottom();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _premiumHandledMessages.remove(key);
+        });
+      }
+      rethrow;
+    } finally {
+      if (mounted) {
+        setState(() => _isAskingAi = false);
+      }
+    }
+  }
+
+  // ignore: unused_element
   Widget _buildPremiumAgentBanner(ThemeData theme, ColorScheme colorScheme) {
     final thinking = _isPremiumAgentThinking;
     final accent = thinking ? colorScheme.tertiary : colorScheme.primary;
-    final title =
-        thinking ? 'Premium Agent dang phan tich' : 'Premium Agent dang lang nghe';
+    final title = thinking
+        ? 'Premium Agent dang phan tich'
+        : 'Premium Agent dang lang nghe';
     final subtitle = thinking
         ? 'Bot dang tong hop transcript va bo canh de dua ra phan hoi phu hop ngay trong cuoc hop.'
         : 'Bot premium co the chu dong ho tro khi phat hien cau hoi kho hoac tinh huong thieu thong tin trong tai lieu.';
@@ -666,6 +812,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     );
   }
 
+  // ignore: unused_element
   bool _isSummaryTooShort(MeetingSummary summary) {
     final summaryText = summary.summary.trim();
     final hasKeyPoints =
@@ -675,13 +822,50 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     return false;
   }
 
+  Future<void> _discardCurrentMeeting(String sid) async {
+    _meetingService.stopStreaming();
+    try {
+      await _meetingService.deleteMeeting(sid);
+    } catch (e) {
+      print('Error deleting short meeting: $e');
+    }
+  }
+
+  Future<void> _confirmExitMeeting() async {
+    if (!mounted || _isSummarizing) return;
+
+    final shouldEnd = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kết thúc cuộc họp?'),
+        content: const Text(
+          'Cuộc họp đang diễn ra. Bạn có muốn kết thúc cuộc họp không?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Tiếp tục họp'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Kết thúc'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldEnd == true) {
+      await _handleEndMeeting();
+    }
+  }
+
   Future<void> _handleEndMeeting() async {
     if (_isSummarizing) return;
 
     setState(() => _isSummarizing = true);
     await _pauseRecording();
 
-    final sid = _meetingService.meetingSid;
+    final sid = await _meetingService.waitForMeetingSid();
     if (sid == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -707,9 +891,9 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         final choice = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text("Cuộc họp quá ngắn"),
+            title: const Text("Nội dung quá ngắn"),
             content: const Text(
-                "Không đủ dữ liệu để tóm tắt. Bạn muốn tiếp tục ghi âm hay kết thúc cuộc họp?"),
+                "Nội dung cuộc họp quá ngắn nên không thể tóm tắt. Bạn muốn tiếp tục ghi âm hay kết thúc hẳn cuộc họp này?"),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -729,7 +913,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
           return;
         }
 
-        _meetingService.stopStreaming();
+        await _discardCurrentMeeting(sid);
         if (mounted) {
           setState(() => _isSummarizing = false);
           context.go('/app/meeting');
@@ -749,7 +933,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         builder: (context) => AlertDialog(
           title: const Text("Không thể tóm tắt"),
           content: const Text(
-              "Cuộc họp có thể quá ngắn hoặc chưa đủ dữ liệu. Bạn muốn tiếp tục ghi âm hay kết thúc?"),
+              "Cuộc họp có thể quá ngắn hoặc chưa đủ dữ liệu để tóm tắt. Bạn muốn tiếp tục ghi âm hay kết thúc hẳn cuộc họp này?"),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -769,7 +953,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         return;
       }
 
-      _meetingService.stopStreaming();
+      await _discardCurrentMeeting(sid);
       if (mounted) {
         setState(() => _isSummarizing = false);
         context.go('/app/meeting');
@@ -777,6 +961,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     }
   }
 
+  // ignore: unused_element
   String? _answerFromContext(String question, String context) {
     // Simple heuristic: find sentences containing keywords from question
     final words = question
@@ -806,12 +991,14 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     return "Dựa trên tài liệu đã tải lên:\n- ${matches.join("\n- ")}";
   }
 
+  // ignore: unused_element
   String _answerFreely(String question) {
     final trimmed = question.trim();
     if (trimmed.isEmpty) return "Bạn hãy đặt câu hỏi cụ thể hơn nhé.";
     return "Không có tài liệu đính kèm nên mình trả lời tự do theo hiểu biết chung.\n\nCâu hỏi của bạn: $trimmed";
   }
 
+  // ignore: unused_element
   Future<void> _showSpeakerNameDialog(String speakerId) async {
     if (!mounted || _isDialogOpen) return;
 
@@ -820,7 +1007,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
 
     return showDialog<void>(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (BuildContext context) {
         final theme = Theme.of(context);
         return AlertDialog(
@@ -955,6 +1142,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     }
   }
 
+  // ignore: unused_element
   Widget _buildMessage(TranscriptMessage msg, BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -965,7 +1153,9 @@ class _InMeetingScreenState extends State<InMeetingScreen>
 
     // Lấy màu cho speaker
     int speakerIndex = _speakerNames.keys.toList().indexOf(msg.speaker);
-    Color avatarColor = _speakerColors[speakerIndex % _speakerColors.length];
+    final safeSpeakerIndex = speakerIndex >= 0 ? speakerIndex : 0;
+    Color avatarColor =
+        _speakerColors[safeSpeakerIndex % _speakerColors.length];
     final bool isQuestion = _aiEnabled && !isAi && _isQuestionText(msg.text);
 
     final bubble = Container(
@@ -1101,63 +1291,214 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     );
   }
 
+  Widget _buildStableMeetingScaffold(ThemeData theme, ColorScheme colorScheme) {
+    return WillPopScope(
+      onWillPop: () async {
+        await _confirmExitMeeting();
+        return false;
+      },
+      child: Scaffold(
+      backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        title: Text(
+          _meetingTitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: colorScheme.onSurface,
+          ),
+          onPressed: _confirmExitMeeting,
+        ),
+        actions: [
+          if (_aiEnabled)
+            IconButton(
+              tooltip: 'Ask AI',
+              icon: const Icon(Icons.chat_bubble_outline_rounded),
+              onPressed: _openAskAiSheet,
+            ),
+          IconButton(
+            tooltip: 'End',
+            icon: const Icon(Icons.call_end, color: Colors.red),
+            onPressed: _handleEndMeeting,
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: _messages.isEmpty
+            ? Center(
+                child: Text(
+                  _isPaused ? 'Paused' : 'Dang lang nghe...',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            : ListView.separated(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                itemCount: _messages.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final message = _messages[index];
+                  final speaker =
+                      _speakerNames[message.speaker] ?? message.speaker;
+                  final isAi = message.speaker == 'AI Agent';
+                  final showAiPrompt = _shouldShowAiAnswerPrompt(message);
+                  final alreadyRequested = !showAiPrompt &&
+                      _premiumHandledMessages
+                          .contains(InMeetingLogic.buildMessageKey(message));
+
+                  return Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: isAi
+                          ? colorScheme.primaryContainer
+                          : colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          speaker,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: isAi
+                                ? colorScheme.primary
+                                : colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          message.text,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: isAi
+                                ? colorScheme.onPrimaryContainer
+                                : colorScheme.onSurface,
+                          ),
+                        ),
+                        if (showAiPrompt) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surface.withOpacity(0.72),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: colorScheme.primary.withOpacity(0.18),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Bạn có muốn AI trả lời câu hỏi này không?',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.onSurface,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                FilledButton(
+                                  onPressed: _isAskingAi
+                                      ? null
+                                      : () async {
+                                          try {
+                                            await _askAiForTranscriptMessage(
+                                                message);
+                                          } catch (e) {
+                                            if (!mounted) return;
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Không thể gọi AI: $e'),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                  child: Text(
+                                      _isAskingAi ? 'Đang trả lời...' : 'Trả lời'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (alreadyRequested && !isAi) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            'AI đã được gọi cho câu hỏi này.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          if (!_isRecording) {
+            _startRecording();
+          } else if (_isPaused) {
+            _resumeRecording();
+          } else {
+            _pauseRecording();
+          }
+        },
+        backgroundColor: _isPaused ? Colors.orange : colorScheme.primary,
+        child: Icon(
+          _isRecording ? (_isPaused ? Icons.play_arrow : Icons.pause) : Icons.mic,
+          color: Colors.white,
+        ),
+      ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    return _buildStableMeetingScaffold(theme, colorScheme);
 
+    /*
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        centerTitle: true,
-        title: Column(
-          children: [
-            Text(
-              _meetingTitle,
-              style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-            ),
+        centerTitle: false,
+        title: Text(
+          _meetingTitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
             // Recording Status Indicator ở dưới title
-            if (_isRecording)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedBuilder(
-                    animation: _pulseAnimation,
-                    builder: (context, child) {
-                      final dotColor = _isPaused ? Colors.orange : Colors.red;
-                      return Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: dotColor,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: dotColor.withOpacity(
-                                  _isPaused ? 0.5 : _pulseAnimation.value),
-                              blurRadius: 4,
-                              spreadRadius: 2,
-                            )
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _isPaused ? 'Paused' : 'Recording...',
-                    style: TextStyle(
-                      color: _isPaused ? Colors.orange : Colors.red,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-          ],
+          
         ),
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded,
@@ -1171,8 +1512,15 @@ class _InMeetingScreenState extends State<InMeetingScreen>
               icon: const Icon(Icons.chat_bubble_outline_rounded),
               onPressed: _openAskAiSheet,
             ),
+          IconButton(
+            tooltip: 'End',
+            icon: const Icon(Icons.call_end, color: Colors.red),
+            onPressed: () async {
+              await _handleEndMeeting();
+            },
+          ),
           // Nút End Meeting (Nút bấm tròn màu đỏ nổi bật)
-          Padding(
+          if (false) Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: GestureDetector(
               onTap: () {
@@ -1229,13 +1577,11 @@ class _InMeetingScreenState extends State<InMeetingScreen>
       ),
       body: Column(
         children: [
-          if (_premiumAgentEnabled)
-            _buildPremiumAgentBanner(theme, colorScheme),
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
               padding: EdgeInsets.only(
-                bottom: _aiEnabled ? (_premiumAgentEnabled ? 180 : 160) : 100,
+                bottom: _aiEnabled ? 160 : 100,
               ), // Space cho input & FAB
               itemCount: _messages.length,
               itemBuilder: (context, index) {
@@ -1323,9 +1669,9 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         ],
       ),
       // FAB hiển thị trạng thái Micro
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: _aiEnabled ? 96 : 24),
+        padding: EdgeInsets.only(bottom: _aiEnabled ? 88 : 16),
         child: FloatingActionButton.extended(
           onPressed: () {
             if (!_isRecording) {
@@ -1351,5 +1697,6 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         ),
       ),
     );
+    */
   }
 }

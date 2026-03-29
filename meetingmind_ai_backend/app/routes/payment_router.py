@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 
+from app.services.authorization_service import require_same_user
 from app.services.vnpay_service import create_vnpay_payment_url, process_vnpay_result
 
 
@@ -15,6 +16,10 @@ def create_vnpay_payment():
 
     if not user_id or not plan:
         return jsonify({"error": "user_id and plan are required"}), 400
+
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
 
     result, error = create_vnpay_payment_url(
         request,
@@ -62,4 +67,3 @@ def vnpay_ipn():
         return jsonify({"RspCode": "97", "Message": error}), 400
 
     return jsonify({"RspCode": "00", "Message": "Confirm Success", "data": result}), 200
-

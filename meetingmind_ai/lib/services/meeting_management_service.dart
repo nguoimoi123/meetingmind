@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class MeetingManagementService {
   static Future<Map<String, dynamic>> getMeetingDetail({
     required String sid,
   }) async {
-    final res = await http.get(Uri.parse('$apiBaseUrl/meetings/$sid'));
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/meetings/$sid'),
+      headers: await ApiAuthHeaders.build(),
+    );
 
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as Map<String, dynamic>;
@@ -21,7 +25,7 @@ class MeetingManagementService {
   }) async {
     final res = await http.put(
       Uri.parse('$apiBaseUrl/meetings/$sid/tags'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode({'tags': tags}),
     );
 
@@ -50,7 +54,7 @@ class MeetingManagementService {
 
     final res = await http.put(
       Uri.parse('$apiBaseUrl/meetings/$sid/speakers'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode(body),
     );
 
@@ -73,7 +77,7 @@ class MeetingManagementService {
 
     final res = await http.post(
       Uri.parse('$apiBaseUrl/meetings/$sid/action-items/to-tasks'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
       body: jsonEncode(body),
     );
 
@@ -91,7 +95,10 @@ class MeetingManagementService {
   }) async {
     final uri = Uri.parse(
         '$apiBaseUrl/meetings/agenda/next?user_id=$userId&limit=$limit');
-    final res = await http.get(uri);
+    final res = await http.get(
+      uri,
+      headers: await ApiAuthHeaders.build(),
+    );
 
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as Map<String, dynamic>;

@@ -1,13 +1,15 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class NotebookListService {
   static Future<List<dynamic>> fetchFolders(String userId) async {
-    const baseUrl = apiBaseUrl;
+    final baseUrl = apiBaseUrl;
 
     final response = await http.get(
       Uri.parse('$baseUrl/folder/$userId'),
+      headers: await ApiAuthHeaders.build(),
     );
 
     if (response.statusCode == 200) {
@@ -22,6 +24,7 @@ class NotebookListService {
 
     final response = await http.delete(
       Uri.parse('$baseUrl/folder/delete/$folderId'),
+      headers: await ApiAuthHeaders.build(),
     );
 
     if (response.statusCode != 200) {

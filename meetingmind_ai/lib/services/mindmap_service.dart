@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class MindmapService {
   static Future<Map<String, dynamic>> generateMindmap(
@@ -11,7 +12,7 @@ class MindmapService {
     try {
       final response = await http.post(
         Uri.parse('$apiBaseUrl/grap_visual/generate_visual/$folderId'),
-        headers: {'Content-Type': 'application/json'},
+        headers: await ApiAuthHeaders.build(json: true),
         body: jsonEncode({
           'user_id': userId,
           'name': name ?? 'Sơ đồ tư duy',
@@ -32,6 +33,7 @@ class MindmapService {
     try {
       final response = await http.get(
         Uri.parse('$apiBaseUrl/grap_visual/get_visual/$resultId'),
+        headers: await ApiAuthHeaders.build(),
       );
 
       if (response.statusCode == 200) {

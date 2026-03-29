@@ -4,6 +4,11 @@ from app.services.meeting_service import get_or_create_meeting, save_summary, ap
 from app.models.meeting_model import Meeting
 from app.services.rag_service import ingest_meeting_transcript
 from app.services.reminder_service import ReminderController
+from app.services.authorization_service import (
+    get_authenticated_user_id,
+    require_meeting_owner,
+    require_same_user,
+)
 
 bp = Blueprint("summarize", __name__)
 
@@ -20,6 +25,14 @@ def summarize_sid(sid):
         if not user_id:
             user_id = 'default_user'
         meeting = get_or_create_meeting(sid, user_id)
+
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
+
+    _, meeting, meeting_error = require_meeting_owner(request, sid)
+    if meeting_error:
+        return meeting_error
     
     # Kiểm tra xem đã có transcript trong DB chưa
     if not meeting.full_transcript:
@@ -73,6 +86,10 @@ def summarize_sid(sid):
 
 @bp.route("/summarize", methods=["POST"])
 def summarize_post():
+    _, auth_error = get_authenticated_user_id(request)
+    if auth_error:
+        return auth_error
+
     body = request.get_json()
     transcript = body.get("transcript", "").strip()
     if not transcript:

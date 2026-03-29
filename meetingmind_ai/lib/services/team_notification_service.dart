@@ -22,13 +22,22 @@ class TeamNotificationService {
   void connect(String userId) {
     if (_socket != null && _socket!.connected && _userId == userId) return;
 
+    _connectInternal(userId);
+  }
+
+  Future<void> _connectInternal(String userId) async {
     _userId = userId;
     _socket?.dispose();
+    final prefs = await SharedPreferences.getInstance();
+    final accessToken = prefs.getString('accessToken') ?? '';
 
     _socket = IO.io(apiBaseUrl, <String, dynamic>{
       'transports': ['websocket'],
       'autoConnect': false,
-      'query': {'user_id': userId},
+      'query': {
+        'user_id': userId,
+        if (accessToken.isNotEmpty) 'access_token': accessToken,
+      },
     });
 
     _socket!.connect();

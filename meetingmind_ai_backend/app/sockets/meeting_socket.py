@@ -8,6 +8,7 @@ from flask_socketio import emit
 from app.extensions import socketio
 from app.models.meeting_model import Meeting
 from app.services.meeting_service import get_or_create_meeting, update_speaker_name
+from app.services.auth_token_service import verify_user_token
 from app.services.plan_service import get_plan_limits, get_user_plan
 from app.services.speechmatics_service import sm_worker
 
@@ -25,6 +26,17 @@ def start_streaming(data=None):
         user_id = request.args.get("user_id")
     if not user_id:
         emit("status", {"msg": "Missing user_id"})
+        return
+
+    access_token = None
+    if isinstance(data, dict):
+        access_token = data.get("access_token")
+    if not access_token:
+        access_token = request.args.get("access_token")
+
+    token_user_id = verify_user_token(access_token) if access_token else None
+    if not token_user_id or str(token_user_id) != str(user_id):
+        emit("status", {"msg": "Unauthorized", "code": "unauthorized"})
         return
 
     plan = get_user_plan(user_id)

@@ -1,53 +1,47 @@
-from flask import Blueprint, request, jsonify
 from datetime import datetime
+
+from flask import Blueprint, jsonify, request
+
+from app.models.chunk_model import Chunk
+from app.services.agenda_service import generate_next_meeting_agenda
+from app.services.authorization_service import require_meeting_owner, require_same_user
 from app.services.meeting_service import get_user_meetings, update_meeting_meta
 from app.services.reminder_service import ReminderController
-from app.services.agenda_service import generate_next_meeting_agenda
-from app.models.meeting_model import Meeting
-from app.models.chunk_model import Chunk
 
 meeting_bp = Blueprint("meetings", __name__, url_prefix="/meetings")
 
+
 @meeting_bp.route("/", methods=["GET"])
 def list_meetings():
-    """
-    API lấy danh sách cuộc họp.
-    Param: user_id (string)
-    """
-    user_id = request.args.get('user_id')
-    tag = request.args.get('tag')
-    
+    user_id = request.args.get("user_id")
+    tag = request.args.get("tag")
+
     if not user_id:
         return jsonify({"error": "Missing user_id parameter"}), 400
+
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
 
     try:
         meetings = get_user_meetings(user_id)
         if tag:
             meetings = meetings.filter(tags__in=[tag])
-        # Convert list object sang JSON
-        result = [m.to_dict() for m in meetings]
-        return jsonify(result), 200
+        return jsonify([meeting.to_dict() for meeting in meetings]), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
 @meeting_bp.route("/<sid>", methods=["DELETE"])
 def delete_meeting(sid):
-    """
-    Xóa cuộc họp và toàn bộ dữ liệu liên quan (RAG chunks).
-    """
     try:
-        # 1. Xóa bản ghi Meeting
-        meeting = Meeting.objects(sid=sid).first()
-        if not meeting:
-            return jsonify({"error": "Meeting not found"}), 404
-        
-        meeting.delete()
+        _, meeting, auth_error = require_meeting_owner(request, sid)
+        if auth_error:
+            return auth_error
 
-        # 2. Xóa các Chunks liên quan (RAG) trong bảng Chunks
-        # (Trong model chunk_model ta dùng folder_id để lưu sid của meeting)
+        meeting.delete()
         deleted_chunks = Chunk.objects(folder_id=sid).delete()
         print(f"Deleted {deleted_chunks} chunks for meeting {sid}")
-
         return jsonify({"message": "Meeting deleted successfully"}), 200
     except Exception as e:
         print(f"Error deleting meeting: {e}")
@@ -56,16 +50,16 @@ def delete_meeting(sid):
 
 @meeting_bp.route("/<sid>", methods=["PUT"])
 def update_meeting(sid):
-    """
-    Cập nhật thông tin cuộc họp (hiện tại hỗ trợ đổi title).
-    Body: { "title": "My Meeting" }
-    """
     data = request.get_json() or {}
     title = data.get("title")
     user_id = data.get("user_id") or request.args.get("user_id")
 
     if not title:
         return jsonify({"error": "Missing title"}), 400
+
+    _, _, auth_error = require_meeting_owner(request, sid)
+    if auth_error:
+        return auth_error
 
     try:
         meeting = update_meeting_meta(sid, title=title, user_id=user_id)
@@ -85,10 +79,10 @@ def update_meeting_tags(sid):
         return jsonify({"error": "tags must be a list"}), 400
 
     try:
-        meeting = Meeting.objects(sid=sid).first()
-        if not meeting:
-            return jsonify({"error": "Meeting not found"}), 404
-        meeting.tags = [str(t).strip() for t in tags if str(t).strip()]
+        _, meeting, auth_error = require_meeting_owner(request, sid)
+        if auth_error:
+            return auth_error
+        meeting.tags = [str(tag).strip() for tag in tags if str(tag).strip()]
         meeting.save()
         return jsonify({"id": meeting.sid, "tags": meeting.tags}), 200
     except Exception as e:
@@ -106,9 +100,9 @@ def update_speaker_mapping(sid):
         return jsonify({"error": "speaker_names or speaker_id/name required"}), 400
 
     try:
-        meeting = Meeting.objects(sid=sid).first()
-        if not meeting:
-            return jsonify({"error": "Meeting not found"}), 404
+        _, meeting, auth_error = require_meeting_owner(request, sid)
+        if auth_error:
+            return auth_error
 
         if speaker_names is None:
             speaker_names = {speaker_id: name}
@@ -116,10 +110,10 @@ def update_speaker_mapping(sid):
         if meeting.speaker_names is None:
             meeting.speaker_names = {}
 
-        for k, v in speaker_names.items():
-            if not k or not v:
+        for key, value in speaker_names.items():
+            if not key or not value:
                 continue
-            meeting.speaker_names[str(k)] = str(v)
+            meeting.speaker_names[str(key)] = str(value)
 
         meeting.save()
         return jsonify({"id": meeting.sid, "speaker_names": meeting.speaker_names}), 200
@@ -137,12 +131,16 @@ def action_items_to_tasks(sid):
     if not user_id:
         return jsonify({"error": "Missing user_id"}), 400
 
-    meeting = Meeting.objects(sid=sid).first()
-    if not meeting:
-        return jsonify({"error": "Meeting not found"}), 404
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
+
+    _, meeting, meeting_error = require_meeting_owner(request, sid)
+    if meeting_error:
+        return meeting_error
 
     if items is None:
-        items = [{"title": x} for x in (meeting.action_items or [])]
+        items = [{"title": item} for item in (meeting.action_items or [])]
 
     if default_start:
         try:
@@ -157,7 +155,6 @@ def action_items_to_tasks(sid):
         items=items,
         default_start=default_start_dt,
     )
-
     return jsonify({"created": created, "count": len(created)}), status
 
 
@@ -167,6 +164,10 @@ def get_next_agenda():
     limit = int(request.args.get("limit", 5))
     if not user_id:
         return jsonify({"error": "Missing user_id"}), 400
+
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
 
     try:
         data = generate_next_meeting_agenda(user_id=user_id, limit=limit)
@@ -178,9 +179,9 @@ def get_next_agenda():
 @meeting_bp.route("/<sid>", methods=["GET"])
 def get_meeting_detail(sid):
     try:
-        meeting = Meeting.objects(sid=sid).first()
-        if not meeting:
-            return jsonify({"error": "Meeting not found"}), 404
+        _, meeting, auth_error = require_meeting_owner(request, sid)
+        if auth_error:
+            return auth_error
 
         data = meeting.to_dict()
         data["speaker_names"] = meeting.speaker_names or {}

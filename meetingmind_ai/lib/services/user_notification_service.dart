@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../config/api_config.dart';
 import '../models/user_notification.dart';
+import 'api_auth_headers.dart';
 
 class UserNotificationService {
   static Future<Map<String, dynamic>> fetchNotifications({
@@ -12,6 +13,7 @@ class UserNotificationService {
   }) async {
     final res = await http.get(
       Uri.parse('$apiBaseUrl/user/notifications/$userId?limit=$limit'),
+      headers: await ApiAuthHeaders.build(),
     );
     final body = res.body.isNotEmpty ? jsonDecode(res.body) : {};
 
@@ -40,7 +42,7 @@ class UserNotificationService {
   }) async {
     final res = await http.post(
       Uri.parse('$apiBaseUrl/user/notifications/$userId/read-all'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
     );
     if (res.statusCode != 200) {
       final body = res.body.isNotEmpty ? jsonDecode(res.body) : {};
@@ -57,7 +59,7 @@ class UserNotificationService {
   }) async {
     final res = await http.delete(
       Uri.parse('$apiBaseUrl/user/notifications/$userId/$notificationId'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await ApiAuthHeaders.build(json: true),
     );
     if (res.statusCode != 200) {
       final body = res.body.isNotEmpty ? jsonDecode(res.body) : {};

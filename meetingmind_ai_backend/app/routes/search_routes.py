@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from app.models.meeting_model import Meeting
 from app.models.folder_model import Folder
 from app.models.file_model import File
+from app.services.authorization_service import require_same_user
 
 search_bp = Blueprint("search", __name__, url_prefix="/search")
 
@@ -14,6 +15,10 @@ def search_all():
 
     if not user_id or not query:
         return jsonify({"error": "user_id and q are required"}), 400
+
+    _, auth_error = require_same_user(request, user_id)
+    if auth_error:
+        return auth_error
 
     q = query
 

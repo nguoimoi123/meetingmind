@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class PlanService {
   static Future<Map<String, dynamic>> getPlanInfo({
     required String userId,
   }) async {
-    final res = await http.get(Uri.parse('$apiBaseUrl/user/plan/$userId'));
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/user/plan/$userId'),
+      headers: await ApiAuthHeaders.build(),
+    );
     final body = res.body.isNotEmpty ? jsonDecode(res.body) : {};
 
     if (res.statusCode == 200) {
