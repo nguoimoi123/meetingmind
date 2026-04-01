@@ -125,6 +125,12 @@ class MeetingService {
     _socket = null;
   }
 
+  void dispose() {
+    disconnect();
+    _transcriptController.close();
+    _statusController.close();
+  }
+
   void startStreaming({String? title}) {
     final payload = <String, dynamic>{'user_id': userId};
     final payloadTitle = (title ?? meetingTitle)?.trim();
@@ -152,7 +158,14 @@ class MeetingService {
 
   void stopStreaming() {
     _isRecording = false;
-    _socket?.disconnect();
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('end_meeting');
+      Future<void>.delayed(const Duration(milliseconds: 120), () {
+        _socket?.disconnect();
+      });
+    } else {
+      _socket?.disconnect();
+    }
     _statusController.add('Recording stopped');
   }
 

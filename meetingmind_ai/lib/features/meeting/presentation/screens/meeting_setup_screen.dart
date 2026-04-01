@@ -30,7 +30,7 @@ class _MeetingSetupScreenState extends State<MeetingSetupScreen> {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'txt', 'doc', 'docx'],
+        allowedExtensions: ['txt', 'docx'],
         withData: true,
       );
 

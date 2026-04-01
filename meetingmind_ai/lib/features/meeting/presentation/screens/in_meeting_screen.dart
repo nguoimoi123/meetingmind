@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'dart:io';
@@ -13,8 +13,8 @@ import 'package:meetingmind_ai/services/summary_service.dart';
 import 'package:meetingmind_ai/models/meeting_summary.dart';
 import 'package:http/http.dart' as http;
 import 'package:docx_to_text/docx_to_text.dart';
+import 'package:intl/intl.dart';
 import 'package:meetingmind_ai/features/meeting/logic/in_meeting_logic.dart';
-import 'package:meetingmind_ai/features/meeting/presentation/widgets/meeting_transcript_message.dart';
 
 class InMeetingScreen extends StatefulWidget {
   final String? title;
@@ -76,19 +76,19 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   final Set<String> _premiumHandledMessages = {};
   bool _scrollScheduled = false;
 
-  // Animation cho hiệu ứng thu âm
+  // Animation cho hiá»‡u á»©ng thu Ã¢m
   late AnimationController _pulseController;
   // ignore: unused_field
   late Animation<double> _pulseAnimation;
 
-  // Màu sắc rực rỡ cho speaker
+  // MÃ u sáº¯c rá»±c rá»¡ cho speaker
   static const List<Color> _speakerColors = [
-    Color(0xFF2962FF), // Xanh đậm
-    Color(0xFF6200EA), // Tím
-    Color(0xFF00C853), // Xanh lá
+    Color(0xFF2962FF), // Xanh Ä‘áº­m
+    Color(0xFF6200EA), // TÃ­m
+    Color(0xFF00C853), // Xanh lÃ¡
     Color(0xFFFF6D00), // Cam
-    Color(0xFFD50000), // Đỏ
-    Color(0xFF00B0FF), // Xanh da trời
+    Color(0xFFD50000), // Äá»
+    Color(0xFF00B0FF), // Xanh da trá»i
   ];
 
   @override
@@ -97,7 +97,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat(); // Lặp lại animation
+    )..repeat(); // Láº·p láº¡i animation
 
     _pulseAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
@@ -120,7 +120,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
   }
 
   Future<void> _readContextFile() async {
-    // Luôn set title trước
+    // LuÃ´n set title trÆ°á»›c
     final title = widget.title ?? 'Live Meeting';
     setState(() => _meetingTitle = title);
 
@@ -161,14 +161,14 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         }
       } catch (e) {
         print("Error reading context file: $e");
-        // Vẫn set title ngay cả khi đọc file lỗi
+        // Váº«n set title ngay cáº£ khi Ä‘á»c file lá»—i
         _meetingService.setMeetingContext(
           title: title,
           context: null,
         );
       }
     } else {
-      // Không có file context, vẫn set title
+      // KhÃ´ng cÃ³ file context, váº«n set title
       _meetingService.setMeetingContext(
         title: title,
         context: null,
@@ -187,12 +187,12 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     _askController.dispose();
     _chatController.dispose();
     _stopRecording();
-    _meetingService.disconnect();
+    _meetingService.dispose();
     super.dispose();
   }
 
   Future<void> _connectAndStart() async {
-    // Đặt title/context trước khi connect để server nhận meta ngay khi kết nối
+    // Äáº·t title/context trÆ°á»›c khi connect Ä‘á»ƒ server nháº­n meta ngay khi káº¿t ná»‘i
     await _readContextFile();
 
     try {
@@ -208,13 +208,21 @@ class _InMeetingScreenState extends State<InMeetingScreen>
       }
       return;
     }
+    final startReadyCompleter = Completer<bool>();
     _statusStreamSubscription?.cancel();
     _statusStreamSubscription = _meetingService.statusStream.listen((status) {
       if (!mounted) return;
 
       final normalized = status.toLowerCase();
-      if (normalized.contains('unauthorized')) {
+      if (normalized.contains('speechmatics ready')) {
+        if (!startReadyCompleter.isCompleted) {
+          startReadyCompleter.complete(true);
+        }
+      } else if (normalized.contains('unauthorized')) {
         _stopRecording();
+        if (!startReadyCompleter.isCompleted) {
+          startReadyCompleter.complete(false);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.'),
@@ -223,6 +231,20 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         );
       } else if (normalized.contains('meeting limit')) {
         _stopRecording();
+        if (!startReadyCompleter.isCompleted) {
+          startReadyCompleter.complete(false);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(status),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else if (normalized.contains('worker crashed')) {
+        _stopRecording();
+        if (!startReadyCompleter.isCompleted) {
+          startReadyCompleter.complete(false);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(status),
@@ -253,7 +275,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     _transcriptStreamSubscription?.cancel();
     _transcriptStreamSubscription =
         _meetingService.transcriptStream.listen((TranscriptMessage message) {
-      print("📥 Nhận: ${message.speaker}: ${message.text}");
+      print("ðŸ“¥ Nháº­n: ${message.speaker}: ${message.text}");
       if (!mounted) return;
 
       setState(() {
@@ -277,6 +299,21 @@ class _InMeetingScreenState extends State<InMeetingScreen>
       });
       _scrollToBottom();
     });
+
+    final ready = await startReadyCompleter.future
+        .timeout(const Duration(seconds: 8), onTimeout: () => false);
+    if (!ready) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Server meeting chua san sang. Vui long thu lai.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      _meetingService.disconnect();
+      return;
+    }
 
     await _startRecording();
   }
@@ -320,10 +357,10 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         .replaceAll('**', '')
         .replaceAll('*', '')
         .replaceAll('`', '')
-        .replaceAll(RegExp(r'(?m)^\s*#{1,6}\s*'), '')
-        .replaceAll(RegExp(r'(?m)^\s*[-•]+\s*'), '')
-        .replaceAll(RegExp(r'(?m)^\s*//+\s*'), '')
-        .replaceAll(RegExp(r'(?m)^\s*\d+\.\s+'), '')
+        .replaceAll(RegExp(r'^\s*#{1,6}\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'^\s*-\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'^\s*/{2,}\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'^\s*\d+\.\s+', multiLine: true), '')
         .replaceAll(RegExp(r'\n{3,}'), '\n\n')
         .trim();
   }
@@ -341,6 +378,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     return _isQuestionText(message.text);
   }
 
+  // ignore: unused_element
   void _maybeTriggerPremiumAgent(TranscriptMessage message) {
     if (!InMeetingLogic.shouldPremiumAgentAutoRespond(
       message: message,
@@ -539,6 +577,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     required String context,
     String? speakerName,
     bool isProactive = false,
+    bool preferGeneralKnowledge = false,
   }) async {
     final key = _openAiKey;
     if (key == null || key.isEmpty) {
@@ -556,6 +595,8 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         'Người hỏi: $speakerName',
       if (isProactive)
         'Đây là câu hỏi vừa xuất hiện trong cuộc họp, hãy phản hồi như một agent hỗ trợ trực tiếp.',
+      if (preferGeneralKnowledge)
+        'Cau hoi nay co ve la cau hoi chung. Neu khong can boi canh cuoc hop, hay tra loi truc tiep theo kien thuc chung va khong mo dau bang "dua tren cuoc hop".',
       'CONTEXT:\n$context',
       'CÂU HỎI: $question',
     ].join('\n\n');
@@ -593,6 +634,46 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     return _sanitizeAiAnswer(content);
   }
 
+  String? _answerInstantUtilityQuestion(String question) {
+    final normalized = question.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    final now = DateTime.now();
+
+    if (normalized.contains('hÃ´m nay lÃ  ngÃ y bao nhiÃªu') ||
+        normalized.contains('hom nay la ngay bao nhieu') ||
+        normalized == 'hÃ´m nay ngÃ y bao nhiÃªu' ||
+        normalized == 'hom nay ngay bao nhieu' ||
+        normalized.contains('what date')) {
+      return 'HÃ´m nay lÃ  ${DateFormat('dd/MM/yyyy').format(now)}.';
+    }
+
+    if (normalized.contains('hÃ´m nay thá»© máº¥y') ||
+        normalized.contains('hom nay thu may')) {
+      const weekdays = [
+        'Thá»© Hai',
+        'Thá»© Ba',
+        'Thá»© TÆ°',
+        'Thá»© NÄƒm',
+        'Thá»© SÃ¡u',
+        'Thá»© Báº£y',
+        'Chá»§ Nháº­t',
+      ];
+      return 'HÃ´m nay lÃ  ${weekdays[now.weekday - 1]}, ${DateFormat('dd/MM/yyyy').format(now)}.';
+    }
+
+    if (normalized.contains('máº¥y giá»') ||
+        normalized.contains('bay gio may gio') ||
+        normalized.contains('bÃ¢y giá» máº¥y giá»') ||
+        normalized.contains('what time')) {
+      return 'BÃ¢y giá» lÃ  ${DateFormat('HH:mm').format(now)}.';
+    }
+
+    return null;
+  }
+
   Future<String> _resolveAiAnswer({
     required String question,
     required String combinedContext,
@@ -600,45 +681,58 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     String? speakerName,
     bool isProactive = false,
   }) async {
-    if (_aiEnabled && combinedContext.trim().isNotEmpty) {
-      try {
-        if (allowGeneralKnowledge) {
-          return await _askPremiumOpenAi(
-            question: question,
-            context: combinedContext,
-            speakerName: speakerName,
-            isProactive: isProactive,
-          );
-        }
+    final normalizedContext = combinedContext.trim();
+    final hasContext = normalizedContext.isNotEmpty;
+    final isMeetingQuestion = hasContext
+        ? InMeetingLogic.isLikelyMeetingContextQuestion(
+            question,
+            normalizedContext,
+          )
+        : false;
+    final localContextAnswer = hasContext
+        ? InMeetingLogic.answerFromContext(question, normalizedContext)
+        : null;
 
-        return await _askOpenAi(question: question, context: combinedContext);
-      } catch (_) {
-        return allowGeneralKnowledge
-            ? InMeetingLogic.answerPremiumFallback(question, combinedContext)
-            : (InMeetingLogic.answerFromContext(question, combinedContext) ??
-                "Không thể gọi AI lúc này. Vui lòng thử lại hoặc kiểm tra API key.");
+    if (isMeetingQuestion && localContextAnswer != null) {
+      return localContextAnswer;
+    }
+
+    if (allowGeneralKnowledge && _aiEnabled) {
+      try {
+        return await _askPremiumOpenAi(
+          question: question,
+          context: normalizedContext,
+          speakerName: speakerName,
+          isProactive: isProactive,
+          preferGeneralKnowledge: !isMeetingQuestion,
+        );
+      } catch (e) {
+        return InMeetingLogic.answerPremiumFallback(
+          question,
+          normalizedContext,
+        );
       }
     }
 
-    if (combinedContext.trim().isEmpty) {
+    if (!hasContext) {
       return InMeetingLogic.answerFreely(question);
     }
 
-    final found = InMeetingLogic.answerFromContext(question, combinedContext);
+    final found = localContextAnswer;
     if (found != null) {
       return found;
     }
 
     return allowGeneralKnowledge
-        ? InMeetingLogic.answerPremiumFallback(question, combinedContext)
-        : "Không tìm thấy thông tin trong tài liệu đã tải lên để trả lời câu hỏi này.";
+        ? InMeetingLogic.answerPremiumFallback(question, normalizedContext)
+        : "Khong tim thay thong tin trong tai lieu da tai len de tra loi cau hoi nay.";
   }
 
   Future<void> _askAiFromText(String text) async {
     if (_isAskingAi) return;
     setState(() => _isAskingAi = true);
 
-    final combinedContext = InMeetingLogic.buildCombinedContext(
+    var combinedContext = InMeetingLogic.buildCombinedContext(
       documentContext: _contextText,
       messages: _messages,
       speakerNames: _speakerNames,
@@ -679,7 +773,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     }
 
     try {
-      final combinedContext = InMeetingLogic.buildCombinedContext(
+      var combinedContext = InMeetingLogic.buildCombinedContext(
         documentContext: _contextText,
         messages: _messages,
         speakerNames: _speakerNames,
@@ -859,6 +953,63 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     }
   }
 
+  Future<void> _confirmSummarizeAndEndMeeting() async {
+    if (!mounted || _isSummarizing) return;
+
+    final shouldSummarize = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tom tat cuoc hop?'),
+        content: const Text(
+          'Ban co muon tom tat cuoc hop truoc khi ket thuc khong?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Khong'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSummarize == true) {
+      await _handleEndMeeting();
+      return;
+    }
+
+    if (shouldSummarize == false) {
+      await _endMeetingWithoutSummary();
+    }
+  }
+
+  Future<void> _endMeetingWithoutSummary() async {
+    if (_isSummarizing) return;
+
+    setState(() => _isSummarizing = true);
+    await _pauseRecording();
+    final sid = await _meetingService.waitForMeetingSid();
+    _meetingService.stopStreaming();
+
+    if (sid != null) {
+      try {
+        await _meetingService.deleteMeeting(sid);
+      } catch (e) {
+        print('Error deleting meeting without summary: $e');
+      }
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _isSummarizing = false);
+    context.go('/app/meeting');
+  }
+
   Future<void> _handleEndMeeting() async {
     if (_isSummarizing) return;
 
@@ -872,6 +1023,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
           const SnackBar(content: Text("Chưa có SID cuộc họp")),
         );
       }
+      await _resumeRecording();
       if (mounted) setState(() => _isSummarizing = false);
       return;
     }
@@ -1108,14 +1260,14 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         if (data.length <= 5) return;
         _meetingService.sendAudioData(data);
       }, onError: (e) {
-        print("Lỗi thu âm: $e");
+        print("Lá»—i thu Ã¢m: $e");
         if (mounted) setState(() => _isRecording = false);
       }, onDone: () {
-        print("Luồng thu âm kết thúc");
+        print("Luá»“ng thu Ã¢m káº¿t thÃºc");
         if (mounted) setState(() => _isRecording = false);
       });
     } catch (e) {
-      print("Không thể bắt đầu thu âm: $e");
+      print("KhÃ´ng thá»ƒ báº¯t Ä‘áº§u thu Ã¢m: $e");
     }
   }
 
@@ -1151,7 +1303,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
     String initial =
         displayName.isNotEmpty ? displayName[0].toUpperCase() : "?";
 
-    // Lấy màu cho speaker
+    // Láº¥y mÃ u cho speaker
     int speakerIndex = _speakerNames.keys.toList().indexOf(msg.speaker);
     final safeSpeakerIndex = speakerIndex >= 0 ? speakerIndex : 0;
     Color avatarColor =
@@ -1249,7 +1401,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
             isAi ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
           if (!isAi) ...[
-            // Avatar Speaker với màu rực rỡ
+            // Avatar Speaker vá»›i mÃ u rá»±c rá»¡
             Container(
               width: 44,
               height: 44,
@@ -1298,180 +1450,184 @@ class _InMeetingScreenState extends State<InMeetingScreen>
         return false;
       },
       child: Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: false,
-        title: Text(
-          _meetingTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: colorScheme.onSurface,
-          ),
-        ),
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: colorScheme.onSurface,
-          ),
-          onPressed: _confirmExitMeeting,
-        ),
-        actions: [
-          if (_aiEnabled)
-            IconButton(
-              tooltip: 'Ask AI',
-              icon: const Icon(Icons.chat_bubble_outline_rounded),
-              onPressed: _openAskAiSheet,
+        backgroundColor: colorScheme.surface,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          centerTitle: false,
+          title: Text(
+            _meetingTitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
             ),
-          IconButton(
-            tooltip: 'End',
-            icon: const Icon(Icons.call_end, color: Colors.red),
-            onPressed: _handleEndMeeting,
           ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: _messages.isEmpty
-            ? Center(
-                child: Text(
-                  _isPaused ? 'Paused' : 'Dang lang nghe...',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              )
-            : ListView.separated(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-                itemCount: _messages.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final message = _messages[index];
-                  final speaker =
-                      _speakerNames[message.speaker] ?? message.speaker;
-                  final isAi = message.speaker == 'AI Agent';
-                  final showAiPrompt = _shouldShowAiAnswerPrompt(message);
-                  final alreadyRequested = !showAiPrompt &&
-                      _premiumHandledMessages
-                          .contains(InMeetingLogic.buildMessageKey(message));
-
-                  return Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: isAi
-                          ? colorScheme.primaryContainer
-                          : colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(16),
+          leading: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: colorScheme.onSurface,
+            ),
+            onPressed: _confirmExitMeeting,
+          ),
+          actions: [
+            if (_aiEnabled)
+              IconButton(
+                tooltip: 'Ask AI',
+                icon: const Icon(Icons.chat_bubble_outline_rounded),
+                onPressed: _openAskAiSheet,
+              ),
+            IconButton(
+              tooltip: 'End',
+              icon: const Icon(Icons.call_end, color: Colors.red),
+              onPressed: _confirmSummarizeAndEndMeeting,
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: _messages.isEmpty
+              ? Center(
+                  child: Text(
+                    _isPaused ? 'Paused' : 'Dang lang nghe...',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          speaker,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: isAi
-                                ? colorScheme.primary
-                                : colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          message.text,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: isAi
-                                ? colorScheme.onPrimaryContainer
-                                : colorScheme.onSurface,
-                          ),
-                        ),
-                        if (showAiPrompt) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surface.withOpacity(0.72),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: colorScheme.primary.withOpacity(0.18),
-                              ),
+                  ),
+                )
+              : ListView.separated(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                  itemCount: _messages.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final message = _messages[index];
+                    final speaker =
+                        _speakerNames[message.speaker] ?? message.speaker;
+                    final isAi = message.speaker == 'AI Agent';
+                    final showAiPrompt = _shouldShowAiAnswerPrompt(message);
+                    final alreadyRequested = !showAiPrompt &&
+                        _premiumHandledMessages
+                            .contains(InMeetingLogic.buildMessageKey(message));
+
+                    return Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isAi
+                            ? colorScheme.primaryContainer
+                            : colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            speaker,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: isAi
+                                  ? colorScheme.primary
+                                  : colorScheme.onSurface,
                             ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Bạn có muốn AI trả lời câu hỏi này không?',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: colorScheme.onSurface,
-                                      fontWeight: FontWeight.w600,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            message.text,
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: isAi
+                                  ? colorScheme.onPrimaryContainer
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                          if (showAiPrompt) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surface.withOpacity(0.72),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: colorScheme.primary.withOpacity(0.18),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Bạn có muốn AI trả lời câu hỏi này không?',
+                                      style:
+                                          theme.textTheme.bodyMedium?.copyWith(
+                                        color: colorScheme.onSurface,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 12),
-                                FilledButton(
-                                  onPressed: _isAskingAi
-                                      ? null
-                                      : () async {
-                                          try {
-                                            await _askAiForTranscriptMessage(
-                                                message);
-                                          } catch (e) {
-                                            if (!mounted) return;
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                    'Không thể gọi AI: $e'),
-                                                behavior:
-                                                    SnackBarBehavior.floating,
-                                              ),
-                                            );
-                                          }
-                                        },
-                                  child: Text(
-                                      _isAskingAi ? 'Đang trả lời...' : 'Trả lời'),
-                                ),
-                              ],
+                                  const SizedBox(width: 12),
+                                  FilledButton(
+                                    onPressed: _isAskingAi
+                                        ? null
+                                        : () async {
+                                            try {
+                                              await _askAiForTranscriptMessage(
+                                                  message);
+                                            } catch (e) {
+                                              if (!mounted) return;
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                      'Không thể gọi AI: $e'),
+                                                  behavior:
+                                                      SnackBarBehavior.floating,
+                                                ),
+                                              );
+                                            }
+                                          },
+                                    child: Text(_isAskingAi
+                                        ? 'Đang trả lời...'
+                                        : 'Trả lời'),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ] else if (alreadyRequested && !isAi) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            'AI đã được gọi cho câu hỏi này.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w600,
+                          ] else if (alreadyRequested && !isAi) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              'AI đã được gọi cho câu hỏi này.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          if (!_isRecording) {
-            _startRecording();
-          } else if (_isPaused) {
-            _resumeRecording();
-          } else {
-            _pauseRecording();
-          }
-        },
-        backgroundColor: _isPaused ? Colors.orange : colorScheme.primary,
-        child: Icon(
-          _isRecording ? (_isPaused ? Icons.play_arrow : Icons.pause) : Icons.mic,
-          color: Colors.white,
+                      ),
+                    );
+                  },
+                ),
         ),
-      ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            if (!_isRecording) {
+              _startRecording();
+            } else if (_isPaused) {
+              _resumeRecording();
+            } else {
+              _pauseRecording();
+            }
+          },
+          backgroundColor: _isPaused ? Colors.orange : colorScheme.primary,
+          child: Icon(
+            _isRecording
+                ? (_isPaused ? Icons.play_arrow : Icons.pause)
+                : Icons.mic,
+            color: Colors.white,
+          ),
+        ),
       ),
     );
   }
@@ -1497,7 +1653,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
             fontWeight: FontWeight.bold,
             color: colorScheme.onSurface,
           ),
-            // Recording Status Indicator ở dưới title
+            // Recording Status Indicator á»Ÿ dÆ°á»›i title
           
         ),
         leading: IconButton(
@@ -1516,34 +1672,34 @@ class _InMeetingScreenState extends State<InMeetingScreen>
             tooltip: 'End',
             icon: const Icon(Icons.call_end, color: Colors.red),
             onPressed: () async {
-              await _handleEndMeeting();
+              await _confirmSummarizeAndEndMeeting();
             },
           ),
-          // Nút End Meeting (Nút bấm tròn màu đỏ nổi bật)
+          // NÃºt End Meeting (NÃºt báº¥m trÃ²n mÃ u Ä‘á» ná»•i báº­t)
           if (false) Padding(
             padding: const EdgeInsets.only(right: 16.0),
             child: GestureDetector(
               onTap: () {
-                // Xác nhận kết thúc
+                // XÃ¡c nháº­n káº¿t thÃºc
                 showDialog(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text("Kết thúc cuộc họp?"),
+                    title: const Text("Káº¿t thÃºc cuá»™c há»p?"),
                     content: const Text(
-                        "Hệ thống sẽ ngừng ghi âm và chuyển sang trang tổng kết."),
+                        "Há»‡ thá»‘ng sáº½ ngá»«ng ghi Ã¢m vÃ  chuyá»ƒn sang trang tá»•ng káº¿t."),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text("Hủy"),
+                        child: const Text("Há»§y"),
                       ),
                       TextButton(
                         onPressed: () async {
-                          Navigator.pop(context); // Đóng dialog
+                          Navigator.pop(context); // ÄÃ³ng dialog
                           await _handleEndMeeting();
                         },
                         style:
                             TextButton.styleFrom(foregroundColor: Colors.red),
-                        child: const Text("Kết thúc"),
+                        child: const Text("Káº¿t thÃºc"),
                       ),
                     ],
                   ),
@@ -1668,7 +1824,7 @@ class _InMeetingScreenState extends State<InMeetingScreen>
             ),
         ],
       ),
-      // FAB hiển thị trạng thái Micro
+      // FAB hiá»ƒn thá»‹ tráº¡ng thÃ¡i Micro
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: Padding(
         padding: EdgeInsets.only(bottom: _aiEnabled ? 88 : 16),
