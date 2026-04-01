@@ -11,7 +11,7 @@ from app.services.reminder_service import ReminderController
 meeting_bp = Blueprint("meetings", __name__, url_prefix="/meetings")
 
 
-@meeting_bp.route("/", methods=["GET"])
+@meeting_bp.route("/", methods=["GET"], strict_slashes=False)
 def list_meetings():
     user_id = request.args.get("user_id")
     tag = request.args.get("tag")

@@ -221,7 +221,7 @@ class MeetingService {
   }
 
   Future<List<Meeting>> getPastMeetings() async {
-    final uri = Uri.parse('$_serverUrl/meetings?user_id=$userId');
+    final uri = Uri.parse('$_serverUrl/meetings/?user_id=$userId');
 
     try {
       final response = await http
