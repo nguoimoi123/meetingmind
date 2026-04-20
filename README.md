@@ -42,11 +42,4 @@ MeetingMind hỗ trợ ghi âm, chép lời realtime, tóm tắt bằng AI, tạ
 - `meetingmind_ai_backend/`: backend Flask và realtime services
 - `meetingmind_admin_web/`: dashboard admin bằng React + Vite
 
-## Cách chạy dự án
 
-### 1. Chạy backend
-
-Di chuyển vào thư mục backend:
-
-```bash
-cd meetingmind_ai_backend
