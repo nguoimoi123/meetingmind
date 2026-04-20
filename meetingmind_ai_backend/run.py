@@ -1,9 +1,5 @@
 import os
 
-
-if not os.getenv("SOCKETIO_ASYNC_MODE") and os.getenv("RENDER"):
-    os.environ["SOCKETIO_ASYNC_MODE"] = "eventlet"
-
 if os.getenv("SOCKETIO_ASYNC_MODE") == "eventlet":
     import eventlet
 
