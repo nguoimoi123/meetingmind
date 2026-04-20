@@ -9,8 +9,9 @@ def on_connect():
     user_id = request.args.get("user_id")
     access_token = request.args.get("access_token")
     token_user_id = verify_user_token(access_token) if access_token else None
-    if user_id and token_user_id and str(token_user_id) == str(user_id):
-        join_room(user_id)
+    if not user_id or not token_user_id or str(token_user_id) != str(user_id):
+        return False
+    join_room(user_id)
 
 
 @socketio.on("disconnect")
