@@ -15,6 +15,15 @@ from app.services.speechmatics_service import sm_worker
 audio_queues = {}
 
 
+@socketio.on("connect")
+def validate_socket_connect(auth=None):
+    user_id = request.args.get("user_id")
+    access_token = request.args.get("access_token")
+    token_user_id = verify_user_token(access_token) if access_token else None
+    if not user_id or not token_user_id or str(token_user_id) != str(user_id):
+        return False
+
+
 @socketio.on("start_streaming")
 def start_streaming(data=None):
     sid = request.sid

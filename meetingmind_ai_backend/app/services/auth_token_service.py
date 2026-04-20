@@ -38,12 +38,25 @@ def verify_user_token(token: str, max_age_seconds: int = 60 * 60 * 24 * 7):
 
 def extract_bearer_token(request):
     auth_header = request.headers.get("Authorization", "").strip()
-    if not auth_header:
-        return None
+    if auth_header:
+        prefix = "Bearer "
+        if auth_header.startswith(prefix):
+            token = auth_header[len(prefix):].strip()
+            if token:
+                return token
 
-    prefix = "Bearer "
-    if not auth_header.startswith(prefix):
-        return None
+    token = request.headers.get("X-Access-Token", "").strip()
+    if token:
+        return token
 
-    token = auth_header[len(prefix):].strip()
-    return token or None
+    token = request.args.get("access_token", "").strip()
+    if token:
+        return token
+
+    data = request.get_json(silent=True)
+    if isinstance(data, dict):
+        token = str(data.get("access_token") or "").strip()
+        if token:
+            return token
+
+    return None
