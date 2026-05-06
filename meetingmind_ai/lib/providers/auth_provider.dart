@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // Import mới
+import 'package:meetingmind_ai/services/auth_service.dart';
 import 'package:meetingmind_ai/services/plan_service.dart';
 import 'package:meetingmind_ai/services/team_notification_service.dart';
 
@@ -52,9 +53,21 @@ class AuthProvider extends ChangeNotifier {
     }
     _googleUser = _googleSignIn.currentUser; // Thử lấy session google hiện có
 
-    if (_isLoggedIn && _userId != null && _userId!.isNotEmpty) {
-      TeamNotificationService().connect(_userId!);
-      await refreshPlanInfo();
+    if (_isLoggedIn) {
+      final hasUserId = _userId != null && _userId!.isNotEmpty;
+      final hasAccessToken = _accessToken != null && _accessToken!.isNotEmpty;
+
+      if (!hasUserId || !hasAccessToken) {
+        await _resetSession();
+      } else {
+        final isSessionValid = await _validatePersistedSession();
+        if (!isSessionValid) {
+          await _resetSession();
+        } else {
+          TeamNotificationService().connect(_userId!);
+          await refreshPlanInfo();
+        }
+      }
     }
 
     notifyListeners();
@@ -123,17 +136,7 @@ class AuthProvider extends ChangeNotifier {
   // --- HÀM ĐĂNG XUẤT ---
   Future<void> logout() async {
     await _googleSignIn.signOut();
-    TeamNotificationService().disconnect();
-    _googleUser = null;
-    _userId = null;
-    _email = null;
-    _name = null;
-    _accessToken = null;
-    _plan = 'free';
-    _limits = {};
-    _isLoggedIn = false;
-
-    await _clearData(); // Xóa dữ liệu lưu trữ
+    await _resetSession(clearStorage: true);
     notifyListeners();
   }
 
@@ -177,6 +180,47 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _clearData() async {
     if (_prefs != null) {
       await _prefs!.clear(); // Hoặc set các key về false/null
+    }
+  }
+
+  Future<bool> _validatePersistedSession() async {
+    try {
+      final data = await AuthService.currentUser();
+      final resolvedUserId = data['id']?.toString();
+      if (resolvedUserId == null || resolvedUserId.isEmpty) {
+        return false;
+      }
+
+      _userId = resolvedUserId;
+      _email = data['email']?.toString() ?? _email;
+      _name = data['name']?.toString() ?? _name;
+      _plan = data['plan']?.toString() ?? _plan;
+
+      final refreshedToken = data['access_token']?.toString();
+      if (refreshedToken != null && refreshedToken.isNotEmpty) {
+        _accessToken = refreshedToken;
+      }
+
+      await _saveData();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _resetSession({bool clearStorage = true}) async {
+    TeamNotificationService().disconnect();
+    _googleUser = null;
+    _userId = null;
+    _email = null;
+    _name = null;
+    _accessToken = null;
+    _plan = 'free';
+    _limits = {};
+    _isLoggedIn = false;
+
+    if (clearStorage) {
+      await _clearData();
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import 'api_auth_headers.dart';
 
 class AuthService {
   static Future<Map<String, dynamic>> login({
@@ -52,6 +53,24 @@ class AuthService {
     final message = body is Map && body['error'] != null
         ? body['error'].toString()
         : 'Register failed';
+    throw Exception(message);
+  }
+
+  static Future<Map<String, dynamic>> currentUser() async {
+    final res = await http.get(
+      Uri.parse('$apiBaseUrl/user/me'),
+      headers: await ApiAuthHeaders.build(),
+    );
+
+    final body = res.body.isNotEmpty ? jsonDecode(res.body) : {};
+
+    if (res.statusCode == 200) {
+      return body as Map<String, dynamic>;
+    }
+
+    final message = body is Map && body['error'] != null
+        ? body['error'].toString()
+        : 'Unauthorized';
     throw Exception(message);
   }
 }

@@ -16,10 +16,10 @@ class ChatService {
         .replaceAll('**', '')
         .replaceAll('*', '')
         .replaceAll('`', '')
-        .replaceAll(RegExp(r'(?m)^\s*#{1,6}\s*'), '')
-        .replaceAll(RegExp(r'(?m)^\s*[-•]+\s*'), '')
-        .replaceAll(RegExp(r'(?m)^\s*//+\s*'), '')
-        .replaceAll(RegExp(r'(?m)^\s*\d+\.\s+'), '')
+        .replaceAll(RegExp(r'^\s*#{1,6}\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'^\s*[-*]\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'^\s*/{2,}\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'^\s*\d+\.\s+', multiLine: true), '')
         .replaceAll(RegExp(r'\n{3,}'), '\n\n')
         .trim();
   }

@@ -30,6 +30,9 @@ class TeamNotificationService {
     _socket?.dispose();
     final prefs = await SharedPreferences.getInstance();
     final accessToken = prefs.getString('accessToken') ?? '';
+    if (accessToken.isEmpty) {
+      return;
+    }
 
     _socket = IO.io(apiBaseUrl, <String, dynamic>{
       'transports': ['websocket'],

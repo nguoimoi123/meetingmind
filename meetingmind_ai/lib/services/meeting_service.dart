@@ -106,6 +106,20 @@ class MeetingService {
       }
     });
 
+    _socket!.on('connect_error', (error) {
+      print('Socket Connect Error: $error');
+      if (!completer.isCompleted) {
+        completer.completeError(error ?? 'connect_error');
+      }
+    });
+
+    _socket!.on('connect_timeout', (error) {
+      print('Socket Connect Timeout: $error');
+      if (!completer.isCompleted) {
+        completer.completeError(error ?? 'connect_timeout');
+      }
+    });
+
     _socket!.connect();
 
     try {
